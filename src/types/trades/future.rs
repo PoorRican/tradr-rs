@@ -1,7 +1,7 @@
+use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 use crate::types::signals::Side;
-use crate::types::time::Timestamp;
 use crate::types::trades::{calc_cost, Trade};
 use crate::traits::AsDataFrame;
 
@@ -12,7 +12,7 @@ pub struct FutureTrade {
     quantity: f64,
     cost: f64,
     /// The time at which the trade was identified
-    point: Timestamp
+    point: NaiveDateTime
 }
 
 impl FutureTrade {
@@ -21,7 +21,7 @@ impl FutureTrade {
         side: Side,
         price: f64,
         quantity: f64,
-        point: Timestamp,
+        point: NaiveDateTime,
     ) -> FutureTrade {
         let cost = calc_cost(price, quantity);
         FutureTrade {
@@ -42,7 +42,7 @@ impl AsDataFrame for FutureTrade {
             Series::new("price", vec![self.price]),
             Series::new("quantity", vec![self.quantity]),
             Series::new("cost", vec![self.cost]),
-            Series::new("point", vec![self.point.timestamp()]),
+            Series::new("point", vec![self.point]),
         ]).unwrap()
     }
 }
@@ -64,14 +64,14 @@ impl Trade for FutureTrade {
         self.cost
     }
 
-    fn get_point(&self) -> &Timestamp {
+    fn get_point(&self) -> &NaiveDateTime {
         &self.point
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
+    use chrono::{NaiveDateTime, Utc};
     use crate::types::signals::Side;
     use crate::types::trades::future::FutureTrade;
     use crate::types::trades::Trade;
@@ -82,7 +82,9 @@ mod tests {
         let side = Side::Buy;
         let price = 1.0;
         let quantity = 2.0;
-        let point = Utc::now();
+        let point = NaiveDateTime::from_timestamp_opt(
+            Utc::now().timestamp(),
+            0).unwrap();
 
         let trade = FutureTrade::new(side, price, quantity, point);
 
@@ -98,7 +100,7 @@ mod tests {
         let side = Side::Buy;
         let price = 1.0;
         let quantity = 2.0;
-        let point = Utc::now();
+        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let trade = FutureTrade::new(side, price, quantity, point);
         let df = trade.as_dataframe();
@@ -109,6 +111,6 @@ mod tests {
         assert_eq!(df.column("price").unwrap().f64().unwrap().get(0).unwrap(), price);
         assert_eq!(df.column("quantity").unwrap().f64().unwrap().get(0).unwrap(), quantity);
         assert_eq!(df.column("cost").unwrap().f64().unwrap().get(0).unwrap(), trade.cost);
-        assert_eq!(df.column("point").unwrap().i64().unwrap().get(0).unwrap(), point.timestamp());
+        assert_eq!(df.column("point").unwrap().datetime().unwrap().get(0).unwrap(), point.timestamp_millis());
     }
 }

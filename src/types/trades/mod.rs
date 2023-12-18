@@ -2,8 +2,8 @@ pub mod future;
 pub mod executed;
 pub mod failed;
 
+use chrono::NaiveDateTime;
 use crate::types::signals::Side;
-use crate::types::time::Timestamp;
 use crate::traits::AsDataFrame;
 
 pub trait Trade: AsDataFrame {
@@ -15,7 +15,7 @@ pub trait Trade: AsDataFrame {
     /// Get the total cost of the trade
     fn get_cost(&self) -> f64;
 
-    fn get_point(&self) -> &Timestamp;
+    fn get_point(&self) -> &NaiveDateTime;
 }
 
 

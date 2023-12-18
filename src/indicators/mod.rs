@@ -1,9 +1,8 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use polars::prelude::DataFrame;
 
 use crate::types::{
     signals::Signal,
-    time::Timestamp
 };
 
 pub trait Indicator {
@@ -30,7 +29,7 @@ pub trait Indicator {
     /// Determine the signal for a given point in time
     ///
     /// This updates internal signal time-series data
-    fn determine_signal(&mut self, point: Option<Timestamp>);
+    fn determine_signal(&mut self, point: Option<NaiveDateTime>);
 
     /// Calculate indicator and signal data
     fn calc_signals(&mut self);

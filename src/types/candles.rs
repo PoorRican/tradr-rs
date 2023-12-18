@@ -1,11 +1,11 @@
+use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
-use crate::types::time::Timestamp;
 use crate::traits::AsDataFrame;
 
 /// Abstracts a candlestick
 pub struct Candle {
-    pub time: Timestamp,
+    pub time: NaiveDateTime,
     pub open: f64,
     pub high: f64,
     pub low: f64,
@@ -16,7 +16,7 @@ pub struct Candle {
 impl AsDataFrame for Candle {
     fn as_dataframe(&self) -> DataFrame {
         DataFrame::new(vec![
-            Series::new("time", vec![self.time.timestamp()]),
+            Series::new("time", vec![self.time]),
             Series::new("open", vec![self.open]),
             Series::new("high", vec![self.high]),
             Series::new("low", vec![self.low]),
@@ -35,8 +35,9 @@ mod test {
 
     #[test]
     fn test_as_dataframe() {
+        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
         let candle = Candle {
-            time: Utc::now(),
+            time,
             open: 1.0,
             high: 2.0,
             low: 3.0,
@@ -46,9 +47,8 @@ mod test {
         let df = candle.as_dataframe();
         assert_eq!(df.shape(), (1, 6));
         assert_eq!(df.get_column_names(), &["time", "open", "high", "low", "close", "volume"]);
-        assert_eq!(
-            df.column("time").unwrap().get(0).unwrap(),
-            AnyValue::Int64(candle.time.timestamp()));
+        assert_eq!(df.column("time").unwrap().datetime().unwrap().get(0).unwrap(),
+                   time.timestamp_millis());
         assert_eq!(
             df.column("open").unwrap().get(0).unwrap(),
             AnyValue::Float64(candle.open));

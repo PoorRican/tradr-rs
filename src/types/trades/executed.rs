@@ -1,7 +1,7 @@
+use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 use crate::types::signals::Side;
-use crate::types::time::Timestamp;
 use crate::types::trades::future::FutureTrade;
 use crate::types::trades::Trade;
 use crate::traits::AsDataFrame;
@@ -13,7 +13,7 @@ pub struct ExecutedTrade {
     price: f64,
     quantity: f64,
     cost: f64,
-    point: Timestamp
+    point: NaiveDateTime
 }
 
 impl ExecutedTrade {
@@ -40,7 +40,7 @@ impl AsDataFrame for ExecutedTrade {
             Series::new("price", vec![self.price]),
             Series::new("quantity", vec![self.quantity]),
             Series::new("cost", vec![self.cost]),
-            Series::new("point", vec![self.point.timestamp()]),
+            Series::new("point", vec![self.point]),
         ]).unwrap()
     }
 }
@@ -62,7 +62,7 @@ impl Trade for ExecutedTrade {
         self.cost
     }
 
-    fn get_point(&self) -> &Timestamp {
+    fn get_point(&self) -> &NaiveDateTime {
         &self.point
     }
 }
@@ -83,7 +83,7 @@ mod test {
         let price = 1.0;
         let quantity = 2.0;
         let cost = calc_cost(price, quantity);
-        let point = Utc::now();
+        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let future_trade = FutureTrade::new(
             side,
@@ -112,7 +112,7 @@ mod test {
         let price = 1.0;
         let quantity = 2.0;
         let cost = 3.0;
-        let point = Utc::now();
+        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let trade = ExecutedTrade {
             id: id.clone(),
@@ -131,6 +131,6 @@ mod test {
         assert_eq!(df.column("quantity").unwrap().f64().unwrap().get(0).unwrap(), quantity);
         assert_eq!(df.column("cost").unwrap().f64().unwrap().get(0).unwrap(), cost);
         assert_eq!(df.column("id").unwrap().utf8().unwrap().get(0).unwrap(), id);
-        assert_eq!(df.column("point").unwrap().i64().unwrap().get(0).unwrap(), point.timestamp());
+        assert_eq!(df.column("point").unwrap().datetime().unwrap().get(0).unwrap(), point.timestamp_millis());
     }
 }
