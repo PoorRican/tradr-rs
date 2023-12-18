@@ -6,4 +6,3 @@ pub mod indicator;
 pub mod strategy;
 pub mod portfolio;
 mod time;
-mod traits;

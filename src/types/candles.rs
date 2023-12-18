@@ -1,7 +1,7 @@
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 use crate::types::time::Timestamp;
-use crate::types::traits::AsDataFrame;
+use crate::traits::AsDataFrame;
 
 /// Abstracts a candlestick
 pub struct Candle {

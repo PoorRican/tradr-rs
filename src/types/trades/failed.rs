@@ -4,8 +4,8 @@ use crate::types::reason_code::ReasonCode;
 use crate::types::signals::Side;
 use crate::types::time::Timestamp;
 use crate::types::trades::future::FutureTrade;
-use crate::types::trades::trade::Trade;
-use crate::types::traits::AsDataFrame;
+use crate::types::trades::Trade;
+use crate::traits::AsDataFrame;
 
 /// Represents a trade that has been rejected by the market or otherwise failed
 pub struct FailedTrade {
@@ -74,8 +74,8 @@ mod test {
     use chrono::Utc;
     use super::*;
     use crate::types::signals::Side;
-    use crate::types::trades::trade::calc_cost;
-    use crate::types::traits::AsDataFrame;
+    use crate::types::trades::calc_cost;
+    use crate::traits::AsDataFrame;
 
     #[test]
     fn test_with_future_trade() {

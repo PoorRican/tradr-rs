@@ -2,9 +2,8 @@ use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 use crate::types::signals::Side;
 use crate::types::time::Timestamp;
-use crate::types::trades::trade::Trade;
-use crate::types::traits::AsDataFrame;
-use super::trade::calc_cost;
+use crate::types::trades::{calc_cost, Trade};
+use crate::traits::AsDataFrame;
 
 /// Represents a potential trade to be executed
 pub struct FutureTrade {
@@ -75,8 +74,8 @@ mod tests {
     use chrono::Utc;
     use crate::types::signals::Side;
     use crate::types::trades::future::FutureTrade;
-    use crate::types::trades::trade::Trade;
-    use crate::types::traits::AsDataFrame;
+    use crate::types::trades::Trade;
+    use crate::traits::AsDataFrame;
 
     #[test]
     fn test_new() {
@@ -84,26 +83,26 @@ mod tests {
         let price = 1.0;
         let quantity = 2.0;
         let point = Utc::now();
-        
+
         let trade = FutureTrade::new(side, price, quantity, point);
-        
+
         assert_eq!(trade.get_side(), side);
         assert_eq!(trade.get_price(), price);
         assert_eq!(trade.get_quantity(), quantity);
         assert_eq!(trade.get_cost(), price * quantity);
         assert_eq!(trade.get_point(), &point);
     }
-    
+
     #[test]
     fn test_as_dataframe() {
         let side = Side::Buy;
         let price = 1.0;
         let quantity = 2.0;
         let point = Utc::now();
-        
+
         let trade = FutureTrade::new(side, price, quantity, point);
         let df = trade.as_dataframe();
-        
+
         assert_eq!(df.shape(), (1, 5));
         assert_eq!(df.get_column_names(), &["side", "price", "quantity", "cost", "point"]);
         assert_eq!(df.column("side").unwrap().i32().unwrap().get(0).unwrap(), side as i32);
