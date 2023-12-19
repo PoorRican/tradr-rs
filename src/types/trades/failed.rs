@@ -4,7 +4,7 @@ use polars::prelude::{NamedFrom, Series};
 use crate::types::reason_code::ReasonCode;
 use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
-use crate::types::trades::Trade;
+use crate::types::trades::{calc_cost, Trade};
 use crate::traits::AsDataFrame;
 
 /// Represents a trade that has been rejected by the market or otherwise failed
@@ -18,6 +18,24 @@ pub struct FailedTrade {
 }
 
 impl FailedTrade {
+    pub fn new(
+        reason: ReasonCode,
+        side: Side,
+        price: f64,
+        quantity: f64,
+        point: NaiveDateTime,
+    ) -> FailedTrade {
+        let cost = calc_cost(price, quantity);
+        FailedTrade {
+            reason,
+            side,
+            price,
+            quantity,
+            cost,
+            point
+        }
+    }
+
     pub fn with_future_trade(
         reason: ReasonCode,
         trade: FutureTrade,
@@ -78,6 +96,32 @@ mod test {
     use crate::traits::AsDataFrame;
 
     #[test]
+    fn test_new() {
+        let reason = ReasonCode::Unknown;
+        let side = Side::Buy;
+        let price = 1.0;
+        let quantity = 2.0;
+        let cost = calc_cost(price, quantity);
+        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+
+        let failed_trade = FailedTrade::new(
+            reason,
+            side,
+            price,
+            quantity,
+            point.clone(),
+        );
+
+        assert_eq!(failed_trade.reason, reason);
+        assert_eq!(failed_trade.side, side);
+        assert_eq!(failed_trade.price, price);
+        assert_eq!(failed_trade.quantity, quantity);
+        assert_eq!(failed_trade.cost, cost);
+        assert_eq!(failed_trade.point, point);
+    }
+
+    /// Test the constructor for `FailedTrade`
+    #[test]
     fn test_with_future_trade() {
         let reason = ReasonCode::Unknown;
         let side = Side::Buy;
@@ -106,6 +150,7 @@ mod test {
         assert_eq!(failed_trade.point, point);
     }
 
+    /// Test the `as_dataframe` method for `FailedTrade`
     #[test]
     fn test_as_dataframe() {
         let reason = ReasonCode::Unknown;
