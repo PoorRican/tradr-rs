@@ -15,3 +15,13 @@ pub enum Side {
     Sell = SELL,
     Buy = BUY,
 }
+
+impl From<i32> for Side {
+    fn from(value: i32) -> Self {
+        match value as isize {
+            SELL => Side::Sell,
+            BUY => Side::Buy,
+            _ => panic!("Invalid side value: {}", value),
+        }
+    }
+}
