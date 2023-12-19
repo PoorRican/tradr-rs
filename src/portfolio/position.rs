@@ -7,7 +7,7 @@ use crate::types::trades::executed::ExecutedTrade;
 use crate::types::trades::Trade;
 
 pub trait PositionHandlers {
-    fn set_as_open_position(&mut self);
+    fn add_open_position(&mut self, trade: &ExecutedTrade);
 
     fn get_open_positions(&self) -> Option<DataFrame>;
 
@@ -17,42 +17,18 @@ pub trait PositionHandlers {
 }
 
 impl PositionHandlers for Portfolio {
-    /// Set the last executed buy trade as an open position
+    /// Add provided trade as an open position
     ///
-    /// This is intended to be called when the timeout has been reached when waiting for a sell trade.
-    /// If a sell trade does not occur within the timeout, the last executed buy trade is set as an open position,
-    /// that way another buy trade may be executed.
-    fn set_as_open_position(&mut self) {
-        // get last row
-        let last_row = self.executed_trades
-            .sort(["point"], false, true)
-            .unwrap()
-            .tail(Some(1));
-
-
-        // extract side
-        let side = last_row
-            .column("side")
-            .unwrap()
-            .get(0)
-            .unwrap();
-
-        // if side is buy, add to timestamp `open_positions`
-        if let AnyValue::Int32(inner) = side {
-            match inner.into() {
-                Side::Buy => {
-                    let millis = last_row
-                        .column("point")
-                        .unwrap()
-                        .datetime()
-                        .unwrap()
-                        .get(0)
-                        .unwrap();
-                    let point = NaiveDateTime::from_timestamp_millis(millis).unwrap();
-                    self.open_positions.push(point);
-                }
-                _ => {}
-            }
+    /// This is intended to be called after a buy trade has been executed. The timestamp of the
+    /// executed trade is added to the `open_positions` vector. The timestamp is used to track
+    /// and the timestamp is removed from the `open_positions` vector by the `clear_open_positions`
+    /// method which uses `select_open_positions` to select open positions that were closed.
+    ///
+    /// # Arguments
+    /// * `trade` - The executed trade to add. Only buy trades are added. Sell trades are ignored.
+    fn add_open_position(&mut self, trade: &ExecutedTrade) {
+        if trade.get_side() == Side::Buy {
+            self.open_positions.push(*trade.get_point());
         }
     }
 
@@ -172,7 +148,6 @@ mod tests {
         signals::Side,
         trades::executed::ExecutedTrade,
     };
-    use crate::types::trades::Trade;
 
     /// Test that open positions are correctly added to the `open_positions` vector.
     /// Also ensure that closed positions are not added to the `open_positions` vector.
@@ -192,9 +167,7 @@ mod tests {
             1.0,
             time,
         );
-        portfolio.add_executed_trade(trade);
-
-        portfolio.set_as_open_position();
+        portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 1);
 
         // add a sell and assert it is *not* added to `open_positions`
@@ -205,9 +178,7 @@ mod tests {
             1.0,
             time + Duration::minutes(1),
         );
-        portfolio.add_executed_trade(trade);
-
-        portfolio.set_as_open_position();
+        portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 1);
 
         // add another buy and assert it is added to `open_positions`
@@ -219,9 +190,7 @@ mod tests {
             1.0,
             time2,
         );
-        portfolio.add_executed_trade(trade);
-
-        portfolio.set_as_open_position();
+        portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 2);
 
         // ensure that the time values are correct in `open_positions`
@@ -231,7 +200,10 @@ mod tests {
 
     #[test]
     fn test_get_open_positions() {
-        // create a portfolio with some executed trades
+        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        assert_eq!(portfolio.get_open_positions(), None);
+
+        // create some executed trades
         // only `trade` and `trade3` should be returned by `get_open_positions`
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
         let trade = ExecutedTrade::new(
@@ -255,32 +227,16 @@ mod tests {
             1.5,
             time + Duration::seconds(2)
         );
-        let trade4 = ExecutedTrade::new(
-            "id".to_string(),
-            Side::Sell,
-            1.0,
-            1.0,
-            time + Duration::seconds(3)
-        );
 
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
         portfolio.add_executed_trade(trade);
         portfolio.add_executed_trade(trade2);
         portfolio.add_executed_trade(trade3);
-        portfolio.add_executed_trade(trade4);
-
-        assert_eq!(portfolio.get_open_positions(), None);
-
-        // manually create open positions
-        // add timestamps for trade and trade3 to `open_positions`
-        portfolio.open_positions.push(time);
-        portfolio.open_positions.push(time + Duration::seconds(2));
 
         // assert that the dataframe returned by `get_open_positions` corresponds to open trades
-        assert_eq!(portfolio.get_open_positions().unwrap().height(), 2);
+        assert_eq!(portfolio.get_open_positions().unwrap().height(), 3);
 
-        let expected_quantity_sum = 1.0 + 1.5;
-        let expected_price_sum = 1.0 + 1.7;
+        let expected_price_sum = 1.0 + 1.5 + 1.7;
+        let expected_quantity_sum = 1.0 + 0.9 + 1.5;
 
         let open_positions = portfolio.get_open_positions().unwrap();
         assert_eq!(open_positions.column("quantity").unwrap().sum::<f64>().unwrap(), expected_quantity_sum);
@@ -323,23 +279,14 @@ mod tests {
 
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
 
-        // manually create open positions, but do not set it yet
-        let open_positions = vec![
-            *trade.get_point(), *trade2.get_point(), *trade3.get_point(), *trade4.get_point()
-        ];
+        // assert that `None` is returned when there are no open positions
+        assert_eq!(portfolio.select_open_positions(1.0), None);
 
         // add trades to `executed_trades`
         portfolio.add_executed_trade(trade);
         portfolio.add_executed_trade(trade2);
         portfolio.add_executed_trade(trade3);
         portfolio.add_executed_trade(trade4);
-
-
-        // assert that `None` is returned when there are no open positions
-        assert_eq!(portfolio.select_open_positions(1.0), None);
-
-        // add open positions to `portfolio`
-        portfolio.open_positions = open_positions;
 
         // assert that `None` is returned when price is 0.9
         let selected_open_positions = portfolio.select_open_positions(0.9);
@@ -410,17 +357,13 @@ mod tests {
             time + Duration::seconds(4)
         );
 
-        // add trades to open positions
-        portfolio.open_positions.push(*trade.get_point());
-        portfolio.open_positions.push(*trade2.get_point());
-        portfolio.open_positions.push(*trade3.get_point());
-        portfolio.open_positions.push(*trade4.get_point());
-
         // add trades to `executed_trades`
         portfolio.add_executed_trade(trade);
         portfolio.add_executed_trade(trade2);
         portfolio.add_executed_trade(trade3);
         portfolio.add_executed_trade(trade4);
+
+        assert_eq!(portfolio.open_positions.len(), 4);
 
         // assert that 3/4 positions are cleared when price is 1.9
         let executed_trade = ExecutedTrade::new(

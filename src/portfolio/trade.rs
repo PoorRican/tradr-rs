@@ -9,7 +9,7 @@ use crate::types::trades::{executed::ExecutedTrade, failed::FailedTrade, Trade};
 use crate::types::trades::future::FutureTrade;
 
 /// Interface methods for storing trades
-pub trait TradeHandlers: AssetHandlers + CapitalHandlers {
+pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
     fn add_failed_trade(&mut self, trade: FailedTrade);
     fn add_executed_trade(&mut self, trade: ExecutedTrade);
     fn is_rate_profitable(&self, rate: f64) -> Option<FutureTrade>;
@@ -37,7 +37,8 @@ impl TradeHandlers for Portfolio {
         if trade.get_side() == Side::Buy {
             self.decrease_capital(trade.get_cost(), *trade.get_point());
             self.increase_assets(trade.get_quantity(), *trade.get_point());
-        } else {
+            self.add_open_position(&trade);
+        } else{
             self.increase_capital(trade.get_cost(), *trade.get_point());
             self.decrease_assets(trade.get_quantity(), *trade.get_point());
         }
@@ -91,12 +92,9 @@ mod tests {
     use chrono::NaiveDateTime;
     use crate::portfolio::assets::AssetHandlers;
     use crate::portfolio::capital::CapitalHandlers;
-    use crate::portfolio::position::PositionHandlers;
-    use crate::portfolio::trade::TradeHandlers;
     use crate::types::reason_code::ReasonCode;
     use crate::types::signals::Side;
     use crate::types::trades::executed::ExecutedTrade;
-    use crate::types::trades::Trade;
 
     /// Test that a failed trade is correctly added to the portfolio storage.
     /// Since the failed storage is only for debugging and backtestesting, no other checks
@@ -185,7 +183,6 @@ mod tests {
 
     #[test]
     fn test_is_rate_profitable() {
-        use crate::types::trades::future::FutureTrade;
         use crate::types::trades::Trade;
         use crate::portfolio::trade::TradeHandlers;
         use crate::portfolio::Portfolio;
@@ -208,7 +205,6 @@ mod tests {
             NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
         );
         portfolio.add_executed_trade(trade);
-        portfolio.set_as_open_position();
         assert_eq!(portfolio.open_positions.len(), 1);
         assert_eq!(portfolio.executed_trades.height(), 1);
 
@@ -226,7 +222,6 @@ mod tests {
             NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
         );
         portfolio.add_executed_trade(trade2);
-        portfolio.set_as_open_position();
 
         // check that the non-profitable trade is not included
         let proposed_trade = portfolio.is_rate_profitable(trade_price).unwrap();
@@ -241,7 +236,6 @@ mod tests {
             NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
         );
         portfolio.add_executed_trade(trade3);
-        portfolio.set_as_open_position();
 
         let proposed_trade = portfolio.is_rate_profitable(trade_price).unwrap();
         assert_eq!(proposed_trade.get_price(), trade_price);
