@@ -10,6 +10,7 @@ pub trait PositionHandlers {
     fn get_open_positions(&self) -> Option<DataFrame>;
 
     fn select_open_positions(&self, price: f64) -> Option<DataFrame>;
+    fn available_open_positions(&self) -> usize;
 }
 
 impl PositionHandlers for Portfolio {
@@ -109,6 +110,15 @@ impl PositionHandlers for Portfolio {
             }
         }
         None
+    }
+
+    /// Return the number of available open positions
+    ///
+    /// This is used for limiting risk buy preventing too many open positions.
+    /// The intention is to prevent any buy trades from being executed if there are too many open positions.
+    /// Therefore, when this value is 0, no buy trades should be attempted.
+    fn available_open_positions(&self) -> usize {
+        self.open_positions_limit - self.open_positions.len()
     }
 }
 
@@ -306,5 +316,25 @@ mod tests {
         assert_eq!(selected_open_positions.height(), 3);
         assert_eq!(selected_open_positions.column("price").unwrap().sum::<f64>().unwrap(), 1.9 + 1.8 + 1.0);
         assert_eq!(selected_open_positions.column("quantity").unwrap().sum::<f64>().unwrap(), 1.0 * 3.0);
+    }
+
+    #[test]
+    fn test_available_open_positions()  {
+        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+
+        // assert that `available_open_positions` is maxed when there are no open positions
+        portfolio.open_positions_limit = 10;
+        assert_eq!(portfolio.available_open_positions(), 10);
+
+        // assert that `available_open_positions` is correctly decremented when an open positions are added
+        portfolio.open_positions.push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
+        assert_eq!(portfolio.available_open_positions(), 9);
+
+        portfolio.open_positions.push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
+        assert_eq!(portfolio.available_open_positions(), 8);
+
+        // assert that `available_open_positions` is 0 when `open_positions_limit` is reached
+        portfolio.open_positions_limit = 2;
+        assert_eq!(portfolio.available_open_positions(), 0);
     }
 }
