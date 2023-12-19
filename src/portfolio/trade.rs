@@ -41,6 +41,7 @@ impl TradeHandlers for Portfolio {
         } else{
             self.increase_capital(trade.get_cost(), *trade.get_point());
             self.decrease_assets(trade.get_quantity(), *trade.get_point());
+            self.clear_open_positions(&trade)
         }
         let row = trade.as_dataframe();
         self.executed_trades = self.executed_trades.vstack(&row).unwrap();
@@ -159,6 +160,7 @@ mod tests {
 
         portfolio.add_executed_trade(trade);
         assert_eq!(portfolio.executed_trades.height(), 1);
+        assert_eq!(portfolio.open_positions.len(), 1);
 
         // check that capital and assets are updated
         assert_eq!(portfolio.get_capital(), 100.0);
@@ -179,6 +181,7 @@ mod tests {
         // check that capital and assets are updated
         assert_eq!(portfolio.get_capital(), 200.0);
         assert_eq!(portfolio.get_assets(), 200.0);
+        assert_eq!(portfolio.open_positions.len(), 0);
     }
 
     #[test]
