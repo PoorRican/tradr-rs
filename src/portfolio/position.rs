@@ -3,6 +3,8 @@ use polars::frame::DataFrame;
 use polars::prelude::*;
 use crate::portfolio::Portfolio;
 use crate::types::signals::Side;
+use crate::types::trades::executed::ExecutedTrade;
+use crate::types::trades::Trade;
 
 pub trait PositionHandlers {
     fn set_as_open_position(&mut self);
@@ -11,6 +13,7 @@ pub trait PositionHandlers {
 
     fn select_open_positions(&self, price: f64) -> Option<DataFrame>;
     fn available_open_positions(&self) -> usize;
+    fn clear_open_positions(&mut self, executed_trade: &ExecutedTrade);
 }
 
 impl PositionHandlers for Portfolio {
@@ -119,6 +122,40 @@ impl PositionHandlers for Portfolio {
     /// Therefore, when this value is 0, no buy trades should be attempted.
     fn available_open_positions(&self) -> usize {
         self.open_positions_limit - self.open_positions.len()
+    }
+
+    /// Clear the open positions that were closed by the executed trade
+    ///
+    /// This is intended to be called after a sell trade has been executed.
+    ///
+    /// Clearing of open positions is totally dependent on the price/rate of the
+    /// executed trade. The amount of trade is not taken into consideration because it
+    /// is assumed that the entire open position was closed. Additionally, the executed trade
+    /// passed is not to have required to have closed any open positions. The method
+    /// `select_open_positions` is relied upon to select open positions both by this method
+    /// and before the executed trade is attempted.
+    ///
+    /// # Arguments
+    /// * `executed_trade` - The executed trade that may have closed any open positions
+    fn clear_open_positions(&mut self, executed_trade: &ExecutedTrade) {
+        let open_positions = self.select_open_positions(executed_trade.get_price());
+
+        if let Some(open_positions) = open_positions {
+            // get the timestamps of the open positions
+            let open_positions_points = open_positions
+                .column("point").unwrap()
+                .datetime().unwrap()
+                .into_iter()
+                .map(|x| NaiveDateTime::from_timestamp_millis(x.unwrap()).unwrap())
+                .collect::<Vec<NaiveDateTime>>();
+
+            // remove the timestamps of the open positions that were closed by the executed trade
+            self.open_positions = self.open_positions
+                .iter()
+                .filter(|x| !open_positions_points.contains(x))
+                .map(|x| *x)
+                .collect();
+        }
     }
 }
 
@@ -336,5 +373,76 @@ mod tests {
         // assert that `available_open_positions` is 0 when `open_positions_limit` is reached
         portfolio.open_positions_limit = 2;
         assert_eq!(portfolio.available_open_positions(), 0);
+    }
+
+    #[test]
+    fn test_clear_open_positions() {
+        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+
+        // create some open positions with varying prices
+        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+        let trade = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            2.0,
+            1.0,
+            time + Duration::seconds(1)
+        );
+        let trade2 = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            1.9,
+            1.0,
+            time + Duration::seconds(2)
+        );
+        let trade3 = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            1.8,
+            1.0,
+            time + Duration::seconds(3)
+        );
+        let trade4 = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            1.0,
+            1.0,
+            time + Duration::seconds(4)
+        );
+
+        // add trades to open positions
+        portfolio.open_positions.push(*trade.get_point());
+        portfolio.open_positions.push(*trade2.get_point());
+        portfolio.open_positions.push(*trade3.get_point());
+        portfolio.open_positions.push(*trade4.get_point());
+
+        // add trades to `executed_trades`
+        portfolio.add_executed_trade(trade);
+        portfolio.add_executed_trade(trade2);
+        portfolio.add_executed_trade(trade3);
+        portfolio.add_executed_trade(trade4);
+
+        // assert that 3/4 positions are cleared when price is 1.9
+        let executed_trade = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Sell,
+            1.9,
+            1.0,
+            time + Duration::seconds(5)
+        );
+        portfolio.clear_open_positions(&executed_trade);
+        assert_eq!(portfolio.open_positions.len(), 1);
+        assert_eq!(portfolio.open_positions[0], time + Duration::seconds(1));
+
+        // assert that all positions are cleared when price is 2.0
+        let executed_trade = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Sell,
+            2.0,
+            1.0,
+            time + Duration::seconds(6)
+        );
+        portfolio.clear_open_positions(&executed_trade);
+        assert!(portfolio.open_positions.is_empty());
     }
 }
