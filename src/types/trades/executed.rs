@@ -3,7 +3,7 @@ use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
-use crate::types::trades::Trade;
+use crate::types::trades::{calc_cost, Trade};
 use crate::traits::AsDataFrame;
 
 /// Represents a trade that has been executed on the market
@@ -17,6 +17,23 @@ pub struct ExecutedTrade {
 }
 
 impl ExecutedTrade {
+    pub fn new(
+        id: String,
+        side: Side,
+        price: f64,
+        quantity: f64,
+        point: NaiveDateTime,
+    ) -> ExecutedTrade {
+        let cost = calc_cost(price, quantity);
+        ExecutedTrade {
+            id,
+            side,
+            price,
+            quantity,
+            cost,
+            point
+        }
+    }
     pub fn with_future_trade(
         id: String,
         trade: FutureTrade,
@@ -75,6 +92,31 @@ mod test {
     use crate::types::signals::Side;
     use crate::types::trades::calc_cost;
     use crate::traits::AsDataFrame;
+
+    #[test]
+    fn test_new() {
+        let id = "id".to_string();
+        let side = Side::Buy;
+        let price = 1.0;
+        let quantity = 2.0;
+        let cost = calc_cost(price, quantity);
+        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+
+        let trade = ExecutedTrade::new(
+            id.clone(),
+            side,
+            price,
+            quantity,
+            point.clone(),
+        );
+
+        assert_eq!(trade.id, id);
+        assert_eq!(trade.side, side);
+        assert_eq!(trade.price, price);
+        assert_eq!(trade.quantity, quantity);
+        assert_eq!(trade.cost, cost);
+        assert_eq!(trade.point, point);
+    }
 
     #[test]
     fn test_with_future_trade() {
