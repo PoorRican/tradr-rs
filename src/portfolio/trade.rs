@@ -1,14 +1,18 @@
+use chrono::{NaiveDateTime, Utc};
 use crate::portfolio::assets::AssetHandlers;
 use crate::portfolio::capital::CapitalHandlers;
 use crate::portfolio::Portfolio;
+use crate::portfolio::position::PositionHandlers;
 use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
 use crate::types::trades::{executed::ExecutedTrade, failed::FailedTrade, Trade};
+use crate::types::trades::future::FutureTrade;
 
 /// Interface methods for storing trades
 pub trait TradeHandlers: AssetHandlers + CapitalHandlers {
     fn add_failed_trade(&mut self, trade: FailedTrade);
     fn add_executed_trade(&mut self, trade: ExecutedTrade);
+    fn is_rate_profitable(&self, rate: f64) -> Option<FutureTrade>;
 }
 
 impl TradeHandlers for Portfolio {
@@ -40,6 +44,45 @@ impl TradeHandlers for Portfolio {
         let row = trade.as_dataframe();
         self.executed_trades = self.executed_trades.vstack(&row).unwrap();
     }
+
+    /// Check if a given rate is profitable to sell assets, then return a `FutureTrade` with the appropriate
+    /// side and quantity.
+    ///
+    /// This method is used to determine if a given rate is profitable to sell assets at. If it is, then
+    /// open positions are selected with the `Portfolio::select_open_positions()` method and the quantity
+    /// of the trade is set to the sum of the quantities of the selected open positions.
+    ///
+    /// # Arguments
+    /// * `rate` - The proposed rate to check
+    ///
+    /// # Returns
+    /// * `Some` - A `FutureTrade` with the appropriate side, quantity, and rate
+    /// * `None` - If the rate is not profitable
+    fn is_rate_profitable(&self, rate: f64) -> Option<FutureTrade> {
+        let viable_positions = self.select_open_positions(rate);
+
+        if let Some(positions) = viable_positions {
+            let quantity: f64 = positions
+                .column("quantity").unwrap()
+                .sum().unwrap();
+            let cost: f64 = positions
+                .column("cost").unwrap()
+                .sum().unwrap();
+
+            let sell_value = quantity * rate;
+            let profit = sell_value - cost;
+            if profit > self.threshold {
+                let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+                return Some(FutureTrade::new(
+                    Side::Sell,
+                    rate,
+                    quantity,
+                    time
+                ))
+            }
+        }
+        None
+    }
 }
 
 
@@ -48,7 +91,12 @@ mod tests {
     use chrono::NaiveDateTime;
     use crate::portfolio::assets::AssetHandlers;
     use crate::portfolio::capital::CapitalHandlers;
+    use crate::portfolio::position::PositionHandlers;
+    use crate::portfolio::trade::TradeHandlers;
     use crate::types::reason_code::ReasonCode;
+    use crate::types::signals::Side;
+    use crate::types::trades::executed::ExecutedTrade;
+    use crate::types::trades::Trade;
 
     /// Test that a failed trade is correctly added to the portfolio storage.
     /// Since the failed storage is only for debugging and backtestesting, no other checks
@@ -133,5 +181,70 @@ mod tests {
         // check that capital and assets are updated
         assert_eq!(portfolio.get_capital(), 200.0);
         assert_eq!(portfolio.get_assets(), 200.0);
+    }
+
+    #[test]
+    fn test_is_rate_profitable() {
+        use crate::types::trades::future::FutureTrade;
+        use crate::types::trades::Trade;
+        use crate::portfolio::trade::TradeHandlers;
+        use crate::portfolio::Portfolio;
+        use chrono::Utc;
+
+        let mut portfolio = Portfolio::new(200.0, 200.0, None);
+        let trade_price = 100.0;
+
+        // check that a rate is not profitable when there are no open positions
+        assert!(portfolio.is_rate_profitable(trade_price).is_none());
+
+        // add an open position
+        let price = 90.0;
+        let quantity = 1.0;
+        let trade = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            price,
+            quantity,
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+        );
+        portfolio.add_executed_trade(trade);
+        portfolio.set_as_open_position();
+        assert_eq!(portfolio.open_positions.len(), 1);
+        assert_eq!(portfolio.executed_trades.height(), 1);
+
+        // check that a properly formatted trade is returned when rate is profitable
+        let proposed_trade = portfolio.is_rate_profitable(trade_price).unwrap();
+        assert_eq!(proposed_trade.get_quantity(), quantity);
+        assert_eq!(proposed_trade.get_price(), trade_price);
+
+        // assert that a non-profitable trade is not included in the proposed trade
+        let trade2 = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            100.1,
+            quantity,
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+        );
+        portfolio.add_executed_trade(trade2);
+        portfolio.set_as_open_position();
+
+        // check that the non-profitable trade is not included
+        let proposed_trade = portfolio.is_rate_profitable(trade_price).unwrap();
+        assert_eq!(proposed_trade.get_price(), trade_price);
+        assert_eq!(proposed_trade.get_quantity(), quantity);
+
+        let trade3 = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            90.0,
+            quantity,
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+        );
+        portfolio.add_executed_trade(trade3);
+        portfolio.set_as_open_position();
+
+        let proposed_trade = portfolio.is_rate_profitable(trade_price).unwrap();
+        assert_eq!(proposed_trade.get_price(), trade_price);
+        assert_eq!(proposed_trade.get_quantity(), quantity * 2.0);
     }
 }
