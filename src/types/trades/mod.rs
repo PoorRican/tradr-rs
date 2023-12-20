@@ -2,6 +2,10 @@ pub mod future;
 pub mod executed;
 pub mod failed;
 
+pub use future::FutureTrade;
+pub use executed::ExecutedTrade;
+pub use failed::FailedTrade;
+
 use chrono::NaiveDateTime;
 use crate::types::signals::Side;
 use crate::traits::AsDataFrame;

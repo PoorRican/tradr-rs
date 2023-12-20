@@ -79,11 +79,12 @@ impl PositionHandlers for Portfolio {
             return None;
         }
 
-        // create a mask for all rows in `executed_trades` who's price is lte `price`
-        let mask = self.executed_trades.column("price").unwrap()
+        // create a mask for all rows in `open_positions` who's price is lte `price`
+        let open_positions = self.get_open_positions().unwrap();
+        let mask = open_positions.column("price").unwrap()
             .f64().unwrap()
             .lt_eq(price);
-        if let Ok(df) = self.executed_trades.filter(&mask) {
+        if let Ok(df) = open_positions.filter(&mask) {
             if df.height() > 0 {
                 return Some(df)
             }
@@ -114,6 +115,10 @@ impl PositionHandlers for Portfolio {
     /// # Arguments
     /// * `executed_trade` - The executed trade that may have closed any open positions
     fn clear_open_positions(&mut self, executed_trade: &ExecutedTrade) {
+        if executed_trade.get_side() != Side::Sell {
+            return;
+        }
+
         let open_positions = self.select_open_positions(executed_trade.get_price());
 
         if let Some(open_positions) = open_positions {
@@ -276,6 +281,13 @@ mod tests {
             1.0,
             time + Duration::seconds(4)
         );
+        let trade5 = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            0.1,
+            1.0,
+            time + Duration::seconds(5)
+        );
 
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
 
@@ -287,6 +299,10 @@ mod tests {
         portfolio.add_executed_trade(trade2);
         portfolio.add_executed_trade(trade3);
         portfolio.add_executed_trade(trade4);
+        portfolio.add_executed_trade(trade5);
+
+        // remove last trade from `open_positions`
+        portfolio.open_positions.pop();
 
         // assert that `None` is returned when price is 0.9
         let selected_open_positions = portfolio.select_open_positions(0.9);
@@ -365,7 +381,18 @@ mod tests {
 
         assert_eq!(portfolio.open_positions.len(), 4);
 
-        // assert that 3/4 positions are cleared when price is 1.9
+        // remove the lowest buy
+        let executed_trade = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Sell,
+            1.0,
+            1.0,
+            time + Duration::seconds(5)
+        );
+        portfolio.clear_open_positions(&executed_trade);
+        assert_eq!(portfolio.open_positions.len(), 3);
+
+        // assert that 2/3 of the remaining positions are cleared when price is 1.9
         let executed_trade = ExecutedTrade::new(
             "id".to_string(),
             Side::Sell,

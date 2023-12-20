@@ -8,9 +8,9 @@ use chrono::{Duration, NaiveDateTime, Utc};
 use polars::prelude::DataFrame;
 use crate::portfolio::tracked::TrackedValue;
 
-const DEFAULT_LIMIT: usize = 4;
-const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
-const DEFAULT_THRESHOLD: f64 = 0.50;
+pub const DEFAULT_LIMIT: usize = 4;
+pub const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
+pub const DEFAULT_THRESHOLD: f64 = 0.50;
 
 /// This struct is used to manage an entire portfolio for a given asset.
 ///

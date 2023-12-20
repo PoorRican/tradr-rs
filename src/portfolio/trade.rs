@@ -1,4 +1,5 @@
 use chrono::{NaiveDateTime, Utc};
+use polars::prelude::DataFrame;
 use crate::portfolio::assets::AssetHandlers;
 use crate::portfolio::capital::CapitalHandlers;
 use crate::portfolio::Portfolio;
@@ -10,12 +11,18 @@ use crate::types::trades::future::FutureTrade;
 
 /// Interface methods for storing trades
 pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
+    fn get_executed_trades(&self) -> &DataFrame;
     fn add_failed_trade(&mut self, trade: FailedTrade);
     fn add_executed_trade(&mut self, trade: ExecutedTrade);
     fn is_rate_profitable(&self, rate: f64) -> Option<FutureTrade>;
 }
 
 impl TradeHandlers for Portfolio {
+    /// Get the executed trades
+    fn get_executed_trades(&self) -> &DataFrame {
+        &self.executed_trades
+    }
+    
     /// Add a failed trade to the portfolio
     ///
     /// Storing "failed trades" is only intended for debugging and backtesting purposes.

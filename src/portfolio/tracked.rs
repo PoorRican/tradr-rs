@@ -22,7 +22,7 @@ where T: Into<Option<NaiveDateTime>> {
 /// at any given point in time. The value is tracked as a total which is incremented and decremented.
 /// 
 /// It is a wrapper around a DataFrame with two columns: `timestamp` and `value`.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TrackedValue(DataFrame);
 
 impl TrackedValue {
