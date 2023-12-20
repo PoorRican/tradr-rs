@@ -1,8 +1,13 @@
 mod tracked;
-pub mod assets;
-pub mod capital;
-pub mod trade;
-pub mod position;
+mod assets;
+mod capital;
+mod trade;
+mod position;
+
+pub use assets::AssetHandlers;
+pub use capital::CapitalHandlers;
+pub use trade::TradeHandlers;
+pub use position::PositionHandlers;
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use polars::prelude::DataFrame;

@@ -101,10 +101,9 @@ mod tests {
     use chrono::{
         NaiveDateTime, Utc
     };
-    use crate::portfolio::Portfolio;
-    use crate::portfolio::assets::AssetHandlers;
-    use crate::portfolio::capital::CapitalHandlers;
-    use crate::portfolio::trade::TradeHandlers;
+    use crate::portfolio::{
+        Portfolio, AssetHandlers, CapitalHandlers, TradeHandlers
+    };
     use crate::types::{
         ReasonCode, Side, ExecutedTrade, FailedTrade, Trade
     };

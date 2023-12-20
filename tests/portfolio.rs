@@ -2,11 +2,10 @@ extern crate tradr;
 
 use std::collections::VecDeque;
 use chrono::{Duration, NaiveDateTime, Utc};
-use tradr::portfolio::{DEFAULT_LIMIT, Portfolio};
-use tradr::portfolio::capital::CapitalHandlers;
-use tradr::portfolio::assets::AssetHandlers;
-use tradr::portfolio::trade::TradeHandlers;
-use tradr::portfolio::position::PositionHandlers;
+use tradr::portfolio::{
+    DEFAULT_LIMIT, Portfolio,
+    CapitalHandlers, AssetHandlers, TradeHandlers, PositionHandlers
+};
 use tradr::types::{
     Side, ExecutedTrade, FutureTrade, Trade
 };

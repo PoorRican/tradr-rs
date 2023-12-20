@@ -144,9 +144,7 @@ impl PositionHandlers for Portfolio {
 mod tests {
     use chrono::{Duration, NaiveDateTime, Utc};
     use crate::portfolio::{
-        Portfolio,
-        position::PositionHandlers,
-        trade::TradeHandlers
+        Portfolio, PositionHandlers, TradeHandlers
     };
     use crate::types::{
         Side,
