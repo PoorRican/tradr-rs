@@ -2,7 +2,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use polars::prelude::DataFrame;
 
 use crate::types::{
-    signals::Signal,
+    Signal,
 };
 
 pub trait Indicator {

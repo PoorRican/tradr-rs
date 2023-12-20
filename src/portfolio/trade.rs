@@ -5,9 +5,10 @@ use crate::portfolio::capital::CapitalHandlers;
 use crate::portfolio::Portfolio;
 use crate::portfolio::position::PositionHandlers;
 use crate::traits::AsDataFrame;
-use crate::types::signals::Side;
-use crate::types::trades::{executed::ExecutedTrade, failed::FailedTrade, Trade};
-use crate::types::trades::future::FutureTrade;
+use crate::types::{
+    Side,
+    ExecutedTrade, FailedTrade, FutureTrade, Trade
+};
 
 /// Interface methods for storing trades
 pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
@@ -97,24 +98,22 @@ impl TradeHandlers for Portfolio {
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDateTime;
+    use chrono::{
+        NaiveDateTime, Utc
+    };
+    use crate::portfolio::Portfolio;
     use crate::portfolio::assets::AssetHandlers;
     use crate::portfolio::capital::CapitalHandlers;
-    use crate::types::reason_code::ReasonCode;
-    use crate::types::signals::Side;
-    use crate::types::trades::executed::ExecutedTrade;
+    use crate::portfolio::trade::TradeHandlers;
+    use crate::types::{
+        ReasonCode, Side, ExecutedTrade, FailedTrade, Trade
+    };
 
     /// Test that a failed trade is correctly added to the portfolio storage.
     /// Since the failed storage is only for debugging and backtestesting, no other checks
     /// are necessary.
     #[test]
     fn test_add_failed_trade() {
-        use crate::types::signals::Side;
-        use crate::types::trades::failed::FailedTrade;
-        use crate::portfolio::trade::TradeHandlers;
-        use crate::portfolio::Portfolio;
-        use chrono::Utc;
-
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
         assert!(portfolio.failed_trades.is_empty());
 
@@ -145,12 +144,6 @@ mod tests {
     /// and that the capital and assets are updated appropriately
     #[test]
     fn test_add_executed_trade() {
-        use crate::types::signals::Side;
-        use crate::types::trades::executed::ExecutedTrade;
-        use crate::portfolio::trade::TradeHandlers;
-        use crate::portfolio::Portfolio;
-        use chrono::Utc;
-
         let mut portfolio = Portfolio::new(200.0, 200.0, None);
 
         // handle a buy
@@ -193,11 +186,6 @@ mod tests {
 
     #[test]
     fn test_is_rate_profitable() {
-        use crate::types::trades::Trade;
-        use crate::portfolio::trade::TradeHandlers;
-        use crate::portfolio::Portfolio;
-        use chrono::Utc;
-
         let mut portfolio = Portfolio::new(200.0, 200.0, None);
         let trade_price = 100.0;
 

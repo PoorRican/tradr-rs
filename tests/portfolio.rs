@@ -7,8 +7,9 @@ use tradr::portfolio::capital::CapitalHandlers;
 use tradr::portfolio::assets::AssetHandlers;
 use tradr::portfolio::trade::TradeHandlers;
 use tradr::portfolio::position::PositionHandlers;
-use tradr::types::signals::Side;
-use tradr::types::trades::{ExecutedTrade, FutureTrade, Trade};
+use tradr::types::{
+    Side, ExecutedTrade, FutureTrade, Trade
+};
 
 /// Simulates a typical scenario in which a portfolio is created, and then
 /// a series of trades are executed, some of which are profitable and some of which are not.

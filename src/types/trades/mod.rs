@@ -1,6 +1,6 @@
-pub mod future;
-pub mod executed;
-pub mod failed;
+mod future;
+mod executed;
+mod failed;
 
 pub use future::FutureTrade;
 pub use executed::ExecutedTrade;

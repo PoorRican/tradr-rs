@@ -2,9 +2,8 @@ use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::*;
 use crate::portfolio::Portfolio;
-use crate::types::signals::Side;
-use crate::types::trades::executed::ExecutedTrade;
-use crate::types::trades::Trade;
+use crate::types::Side;
+use crate::types::{ExecutedTrade, Trade};
 
 pub trait PositionHandlers {
     fn add_open_position(&mut self, trade: &ExecutedTrade);
@@ -150,8 +149,8 @@ mod tests {
         trade::TradeHandlers
     };
     use crate::types::{
-        signals::Side,
-        trades::executed::ExecutedTrade,
+        Side,
+        ExecutedTrade,
     };
 
     /// Test that open positions are correctly added to the `open_positions` vector.

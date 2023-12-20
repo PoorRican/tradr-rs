@@ -1,6 +1,6 @@
 use chrono::NaiveDateTime;
 use crate::portfolio::Portfolio;
-use crate::types::trades::future::FutureTrade;
+use crate::types::FutureTrade;
 
 pub trait Strategy {
     fn get_order_handler(&self) -> &Portfolio;

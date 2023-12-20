@@ -1,4 +1,9 @@
-pub mod reason_code;
-pub mod signals;
-pub mod trades;
-pub mod candles;
+mod reason_code;
+mod signals;
+mod trades;
+mod candles;
+
+pub use reason_code::ReasonCode;
+pub use signals::{Signal, Side};
+pub use trades::{ExecutedTrade, FailedTrade, FutureTrade, Trade};
+pub use candles::Candle;
