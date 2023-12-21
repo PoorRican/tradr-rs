@@ -1,10 +1,15 @@
 use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
+use serde::{Deserialize, Serialize};
 use crate::traits::AsDataFrame;
 
+
 /// Abstracts a candlestick
+#[derive(Serialize, Debug, PartialEq)]
 pub struct Candle {
+    #[serde(serialize_with = "crate::time::naive_dt_serializer")]
+    #[serde(deserialize_with = "crate::time::naive_dt_deserializer")]
     pub time: NaiveDateTime,
     pub open: f64,
     pub high: f64,
@@ -12,6 +17,32 @@ pub struct Candle {
     pub close: f64,
     pub volume: f64,
 }
+
+impl<'de> Deserialize<'de> for Candle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+    {
+        let arr = <[f64; 6]>::deserialize(deserializer)?;
+
+        let time = NaiveDateTime::from_timestamp_opt(arr[0] as i64, 0).unwrap();
+        let open = arr[1];
+        let high = arr[2];
+        let low = arr[3];
+        let close = arr[4];
+        let volume = arr[5];
+
+        Ok(Candle {
+            time,
+            open,
+            high,
+            low,
+            close,
+            volume,
+        })
+    }
+}
+
 
 impl AsDataFrame for Candle {
     fn as_dataframe(&self) -> DataFrame {
