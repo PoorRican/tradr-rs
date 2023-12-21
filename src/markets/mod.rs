@@ -38,5 +38,5 @@ pub trait Market {
     ) -> Result<Vec<Candle>, reqwest::Error>;
 
     /// Submits an order to the exchange and returns the executed trade.
-    async fn submit_order(&self, order: FutureTrade) -> Result<ExecutedTrade, reqwest::Error>;
+    async fn submit_order(&self, order: FutureTrade, product_id: String) -> Result<ExecutedTrade, reqwest::Error>;
 }

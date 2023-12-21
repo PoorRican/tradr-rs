@@ -1,6 +1,10 @@
+mod order;
+
 use async_trait::async_trait;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use crate::markets::{FeeCalculator, Market, SimplePercentageFee};
+use crate::markets::coinbase::order::{CoinbaseOrderRequest, CoinbaseOrderResponse};
 use crate::types::{Candle, ExecutedTrade, FutureTrade};
 
 const BASE_URL: &str = "https://api.exchange.coinbase.com";
@@ -39,6 +43,7 @@ pub struct TradingPairInfo {
 pub struct CoinbaseClient {
     api_key: String,
     api_secret: String,
+    api_passphrase: String,
 
     client: reqwest::Client,
 }
@@ -56,6 +61,7 @@ impl CoinbaseClient {
         Self {
             api_key: "".to_string(),
             api_secret: "".to_string(),
+            api_passphrase: "".to_string(),
             client,
         }
     }
@@ -98,14 +104,44 @@ impl Market for CoinbaseClient {
         Ok(response)
     }
 
-    async fn submit_order(&self, order: FutureTrade) -> Result<ExecutedTrade, reqwest::Error> {
-        todo!()
+    /// Submits an order to the exchange and returns the executed trade.
+    ///
+    /// This method will only submit FOK orders. Therefore, if the order cannot be filled immediately,
+    /// it will be cancelled.
+    ///
+    /// # Arguments
+    /// * `order` - A proposed order to submit to the exchange.
+    ///
+    /// # Returns
+    /// * `ExecutedTrade` - The executed trade returned by the exchange.
+    /// * `reqwest::Error` - If there was an error parsing the order
+    async fn submit_order(&self, order: FutureTrade, product_id: String) -> Result<ExecutedTrade, reqwest::Error> {
+        let request = CoinbaseOrderRequest::with_future_trade(order, product_id);
+
+        let url = format!("{}/orders", BASE_URL);
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("cb-access-key", self.api_key.parse().unwrap());
+        headers.insert("cb-access-sign", base64::encode(self.api_secret.as_bytes()).parse().unwrap());
+        headers.insert("cb-access-passphrase", self.api_passphrase.parse().unwrap());
+        headers.insert("cb-access-timestamp", Utc::now().timestamp().into());
+
+        let response = self.client.post(&url)
+            .json(&request)
+            .headers(headers)
+            .send()
+            .await?
+            .json::<CoinbaseOrderResponse>()
+            .await?;
+
+        Ok(response.into())
     }
 }
 
 
 #[cfg(test)]
 mod tests {
+    use crate::types::Side;
     use super::*;
 
     #[test]
@@ -127,5 +163,23 @@ mod tests {
         let client = CoinbaseClient::new();
         let candles = client.get_candles("BTC-USD", "1m").await.unwrap();
         assert_eq!(candles.len(), 300);
+    }
+
+    #[tokio::test]
+    async fn test_submit_order() {
+
+        let product_id = "BTC-USD".to_string();
+        let client = CoinbaseClient::new();
+        let order = FutureTrade::new(
+            Side::Buy,
+            1.0,
+            1.0,
+            Utc::now().naive_utc(),
+        );
+        let response = client.submit_order(order, product_id).await;
+
+        // TODO: use a small trade or testnet to make this work
+        // we expect this to fail since the endpoint requires authentication
+        assert!(response.is_err());
     }
 }

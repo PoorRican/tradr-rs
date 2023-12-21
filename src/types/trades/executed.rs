@@ -47,6 +47,10 @@ impl ExecutedTrade {
             point: trade.get_point().clone()
         }
     }
+
+    pub fn get_id(&self) -> &String {
+        &self.id
+    }
 }
 
 impl AsDataFrame for ExecutedTrade {
