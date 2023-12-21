@@ -72,14 +72,22 @@ impl TradeHandlers for Portfolio {
         let viable_positions = self.select_open_positions(rate);
 
         if let Some(positions) = viable_positions {
+            // the total quantity of assets to be sold
             let quantity: f64 = positions
                 .column("quantity").unwrap()
                 .sum().unwrap();
+            // the total cost at which the assets were purchased
             let cost: f64 = positions
                 .column("cost").unwrap()
                 .sum().unwrap();
 
-            let sell_value = quantity * rate;
+            // calculate the value of the assets at the proposed rate
+            let sell_value = match self.fee_calculator {
+                Some(ref fee_calculator) => {
+                    fee_calculator.cost_including_fee(quantity * rate, Side::Sell)
+                },
+                None => quantity * rate
+            };
             let profit = sell_value - cost;
             if profit > self.threshold {
                 let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
@@ -98,9 +106,7 @@ impl TradeHandlers for Portfolio {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{
-        NaiveDateTime, Utc
-    };
+    use chrono::{Duration, NaiveDateTime, Utc};
     use crate::portfolio::{
         Portfolio, AssetHandlers, CapitalHandlers, TradeHandlers
     };
@@ -237,5 +243,25 @@ mod tests {
         let proposed_trade = portfolio.is_rate_profitable(trade_price).unwrap();
         assert_eq!(proposed_trade.get_price(), trade_price);
         assert_eq!(proposed_trade.get_quantity(), quantity * 2.0);
+    }
+
+    /// This test is identical to the one above, except that it uses a fee calculator
+    #[test]
+    fn test_is_rate_profitable_denies_trade() {
+        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+        let mut portfolio = Portfolio::new(200.0, 200.0, time - Duration::seconds(1))
+            .add_fee_calculator(crate::markets::SimplePercentageFee::new(1.0));
+        portfolio.set_threshold(1.0);
+
+        // build a buy trade
+        let trade = ExecutedTrade::new(
+            "id".to_string(),
+            Side::Buy,
+            100.0,
+            1.0,
+            time
+        );
+
+        assert!(portfolio.is_rate_profitable(100.1).is_none());
     }
 }

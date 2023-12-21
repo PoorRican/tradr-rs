@@ -11,6 +11,7 @@ pub use position::PositionHandlers;
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use polars::prelude::DataFrame;
+use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
 
 pub const DEFAULT_LIMIT: usize = 4;
@@ -31,6 +32,8 @@ pub struct Portfolio {
     capital_ts: TrackedValue,
     open_positions_limit: usize,
     timeout: Duration,
+
+    fee_calculator: Option<Box<dyn FeeCalculator>>,
 }
 
 impl Portfolio {
@@ -50,7 +53,15 @@ impl Portfolio {
             capital_ts: TrackedValue::with_initial(capital, point),
             open_positions_limit: DEFAULT_LIMIT,
             timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
+            fee_calculator: None
         }
+    }
+
+    /// Builder method for the `fee_calculator` field
+    pub fn add_fee_calculator<T>(mut self, fee_calculator: T) -> Self
+    where T: FeeCalculator + 'static {
+        self.fee_calculator = Some(Box::new(fee_calculator));
+        self
     }
 
     /// Setter for the profitability threshold parameter
@@ -113,6 +124,16 @@ mod tests {
         assert!(portfolio.failed_trades.is_empty());
         assert!(portfolio.executed_trades.is_empty());
         assert!(portfolio.open_positions.is_empty());
+    }
+
+    #[test]
+    fn test_add_fee_calculator() {
+        use crate::markets::SimplePercentageFee;
+        let portfolio = Portfolio::new(100.0, 100.0, None);
+        assert!(portfolio.fee_calculator.is_none());
+
+        let portfolio = portfolio.add_fee_calculator(SimplePercentageFee::new(0.8));
+        assert!(portfolio.fee_calculator.is_some());
     }
 
     #[test]
