@@ -22,6 +22,28 @@ impl ExecutedTrade {
         side: Side,
         price: f64,
         quantity: f64,
+        cost: f64,
+        point: NaiveDateTime,
+    ) -> Self {
+        ExecutedTrade {
+            id,
+            side,
+            price,
+            quantity,
+            cost,
+            point
+        }
+    }
+
+    /// This is a constructor that internally calculates the cost of the trade
+    ///
+    /// This is meant primarily for testing purposes and would not be used for parsing
+    /// actual executed trades.
+    pub fn new_without_cost(
+        id: String,
+        side: Side,
+        price: f64,
+        quantity: f64,
         point: NaiveDateTime,
     ) -> ExecutedTrade {
         let cost = calc_cost(price, quantity);
@@ -103,10 +125,36 @@ mod test {
         let side = Side::Buy;
         let price = 1.0;
         let quantity = 2.0;
+        let cost = 3.0;
+        let point = Utc::now().naive_utc();
+
+        let trade = ExecutedTrade::new(
+            id.clone(),
+            side,
+            price,
+            quantity,
+            cost,
+            point.clone(),
+        );
+
+        assert_eq!(trade.id, id);
+        assert_eq!(trade.side, side);
+        assert_eq!(trade.price, price);
+        assert_eq!(trade.quantity, quantity);
+        assert_eq!(trade.cost, cost);
+        assert_eq!(trade.point, point);
+    }
+
+    #[test]
+    fn test_new_without_cost() {
+        let id = "id".to_string();
+        let side = Side::Buy;
+        let price = 1.0;
+        let quantity = 2.0;
         let cost = calc_cost(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             id.clone(),
             side,
             price,

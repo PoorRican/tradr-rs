@@ -227,6 +227,7 @@ impl Into<ExecutedTrade> for CoinbaseOrderResponse {
             self.side,
             self.price,
             self.size,
+            self.filled_size,
             point
         )
     }

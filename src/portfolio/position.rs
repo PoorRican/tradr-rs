@@ -162,7 +162,7 @@ mod tests {
         assert!(portfolio.open_positions.is_empty());
 
         // add a buy and assert it is added to `open_positions`
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.0,
@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(portfolio.open_positions.len(), 1);
 
         // add a sell and assert it is *not* added to `open_positions`
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
             1.0,
@@ -185,7 +185,7 @@ mod tests {
 
         // add another buy and assert it is added to `open_positions`
         let time2 = time + Duration::minutes(2);
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.0,
@@ -208,21 +208,21 @@ mod tests {
         // create some executed trades
         // only `trade` and `trade3` should be returned by `get_open_positions`
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.0,
             1.0,
             time
         );
-        let trade2 = ExecutedTrade::new(
+        let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.5,
             0.9,
             time + Duration::seconds(1)
         );
-        let trade3 = ExecutedTrade::new(
+        let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.7,
@@ -250,35 +250,35 @@ mod tests {
     #[test]
     fn test_select_open_positions() {
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             2.0,
             1.0,
             time + Duration::seconds(1)
         );
-        let trade2 = ExecutedTrade::new(
+        let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.9,
             1.0,
             time + Duration::seconds(2)
         );
-        let trade3 = ExecutedTrade::new(
+        let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.8,
             1.0,
             time + Duration::seconds(3)
         );
-        let trade4 = ExecutedTrade::new(
+        let trade4 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.0,
             1.0,
             time + Duration::seconds(4)
         );
-        let trade5 = ExecutedTrade::new(
+        let trade5 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             0.1,
@@ -341,28 +341,28 @@ mod tests {
 
         // create some open positions with varying prices
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             2.0,
             1.0,
             time + Duration::seconds(1)
         );
-        let trade2 = ExecutedTrade::new(
+        let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.9,
             1.0,
             time + Duration::seconds(2)
         );
-        let trade3 = ExecutedTrade::new(
+        let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.8,
             1.0,
             time + Duration::seconds(3)
         );
-        let trade4 = ExecutedTrade::new(
+        let trade4 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.0,
@@ -379,7 +379,7 @@ mod tests {
         assert_eq!(portfolio.open_positions.len(), 4);
 
         // remove the lowest buy
-        let executed_trade = ExecutedTrade::new(
+        let executed_trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
             1.0,
@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(portfolio.open_positions.len(), 3);
 
         // assert that 2/3 of the remaining positions are cleared when price is 1.9
-        let executed_trade = ExecutedTrade::new(
+        let executed_trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
             1.9,
@@ -402,7 +402,7 @@ mod tests {
         assert_eq!(portfolio.open_positions[0], time + Duration::seconds(1));
 
         // assert that all positions are cleared when price is 2.0
-        let executed_trade = ExecutedTrade::new(
+        let executed_trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
             2.0,

@@ -152,7 +152,7 @@ mod tests {
         let mut portfolio = Portfolio::new(200.0, 200.0, None);
 
         // handle a buy
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             100.0,
@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(portfolio.get_assets(), 201.0);
 
         // handle a sell
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
             100.0,
@@ -200,7 +200,7 @@ mod tests {
         // add an open position
         let price = 90.0;
         let quantity = 1.0;
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             price,
@@ -217,7 +217,7 @@ mod tests {
         assert_eq!(proposed_trade.get_price(), trade_price);
 
         // assert that a non-profitable trade is not included in the proposed trade
-        let trade2 = ExecutedTrade::new(
+        let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             100.1,
@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(proposed_trade.get_price(), trade_price);
         assert_eq!(proposed_trade.get_quantity(), quantity);
 
-        let trade3 = ExecutedTrade::new(
+        let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             90.0,
@@ -254,7 +254,7 @@ mod tests {
         portfolio.set_threshold(1.0);
 
         // build a buy trade
-        let trade = ExecutedTrade::new(
+        let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             100.0,

@@ -37,7 +37,7 @@ fn market_simulation() {
 
     // simulate a buy order
     let price = prices.pop_front().unwrap();
-    let trade = ExecutedTrade::new(
+    let trade = ExecutedTrade::new_without_cost(
         "id".to_string(),
         Side::Buy,
         *price,
@@ -61,7 +61,7 @@ fn market_simulation() {
 
     // simulate another buy order at a lower price than the first
     let price = prices.pop_front().unwrap();
-    let trade = ExecutedTrade::new(
+    let trade = ExecutedTrade::new_without_cost(
         "id".to_string(),
         Side::Buy,
         *price,
@@ -111,7 +111,7 @@ fn market_simulation() {
 
     // simulate another buy order at a lower price than the second
     let price = prices.pop_front().unwrap();
-    let trade = ExecutedTrade::new(
+    let trade = ExecutedTrade::new_without_cost(
         "id".to_string(),
         Side::Buy,
         *price,
