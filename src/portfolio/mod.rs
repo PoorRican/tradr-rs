@@ -3,6 +3,7 @@ mod assets;
 mod capital;
 mod trade;
 mod position;
+mod persistence;
 
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
@@ -57,6 +58,27 @@ impl Portfolio {
         }
     }
 
+    /// Constructor with loaded data
+    pub fn with_data(
+        failed_trades: DataFrame,
+        executed_trades: DataFrame,
+        open_positions: Vec<NaiveDateTime>,
+        assets_ts: TrackedValue,
+        capital_ts: TrackedValue,
+    ) -> Portfolio {
+        Portfolio {
+            failed_trades,
+            executed_trades,
+            open_positions,
+            threshold: DEFAULT_THRESHOLD,
+            assets_ts,
+            capital_ts,
+            open_positions_limit: DEFAULT_LIMIT,
+            timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
+            fee_calculator: None
+        }
+    }
+
     /// Builder method for the `fee_calculator` field
     pub fn add_fee_calculator<T>(mut self, fee_calculator: T) -> Self
     where T: FeeCalculator + 'static {
@@ -100,6 +122,58 @@ mod tests {
         assets::AssetHandlers,
         capital::CapitalHandlers
     };
+    use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode};
+
+    #[test]
+    fn test_with_data() {
+        use chrono::NaiveDateTime;
+        use crate::types::Side;
+
+        let assets = 100.0;
+        let capital = 100.0;
+        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+
+        let mut portfolio = Portfolio::new(assets, capital, point);
+        let trade = FutureTrade::new(
+            Side::Buy,
+            100.0,
+            1.0,
+            point + Duration::seconds(1)
+        );
+        let executed_trade = ExecutedTrade::with_future_trade(
+            "id".to_string(),
+            trade.clone()
+        );
+        let failed_trade = FailedTrade::with_future_trade(
+            ReasonCode::MarketRejection,
+            trade.clone()
+        );
+
+        portfolio.add_executed_trade(executed_trade);
+        portfolio.add_failed_trade(failed_trade);
+
+        let portfolio = Portfolio::with_data(
+            portfolio.failed_trades,
+            portfolio.executed_trades,
+            portfolio.open_positions,
+            portfolio.assets_ts,
+            portfolio.capital_ts
+        );
+
+        // assert that assets and capital `TrackedValues` were initialized correctly
+        assert_eq!(portfolio.get_assets(), assets + 1.0);
+        assert_eq!(portfolio.get_capital(), capital - 100.0);
+
+        // assert that the default parameters are set correctly
+        assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
+        assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
+        assert_eq!(portfolio.timeout, Duration::minutes(DEFAULT_TIMEOUT_MINUTES));
+
+        // assert that the trade storage is empty
+        assert_eq!(portfolio.executed_trades.height(), 1);
+        assert_eq!(portfolio.failed_trades.height(), 1);
+        assert_eq!(portfolio.open_positions.len(), 1);
+    }
 
     #[test]
     fn test_new() {

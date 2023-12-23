@@ -99,6 +99,18 @@ impl TrackedValue {
     }
 }
 
+impl From<DataFrame> for TrackedValue {
+    fn from(df: DataFrame) -> Self {
+        TrackedValue(df)
+    }
+}
+
+impl Into<DataFrame> for TrackedValue {
+    fn into(self) -> DataFrame {
+        self.0
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -179,5 +191,38 @@ mod tests {
         // assert that correct value is inserted and that the correct timestamp is used
         assert_eq!(chart.0.column("value").unwrap().f64().unwrap().get(1).unwrap(), added_val);
         assert_eq!(chart.0.column("timestamp").unwrap().datetime().unwrap().get(1).unwrap(), added_time.timestamp_millis());
+    }
+
+    #[test]
+    fn test_from_dataframe() {
+        // create a dataframe with 5 rows
+        let df = df!(
+            "timestamp" => [1, 2, 3, 4, 5],
+            "value" => [1.0, 2.0, 3.0, 4.0, 5.0]
+        ).unwrap();
+
+        let tracked = TrackedValue::from(df);
+        assert_eq!(tracked.0.shape(), (5, 2));
+
+        for i in 1..6 {
+            assert_eq!(tracked.0.column("timestamp").unwrap().i32().unwrap().get(i - 1).unwrap(), i as i32);
+            assert_eq!(tracked.0.column("value").unwrap().f64().unwrap().get(i - 1).unwrap(), i as f64);
+        }
+    }
+
+    #[test]
+    fn test_into_dataframe() {
+        // create a dataframe with 5 rows
+        let expected_df = df!(
+            "timestamp" => [1, 2, 3, 4, 5],
+            "value" => [1.0, 2.0, 3.0, 4.0, 5.0]
+        ).unwrap();
+
+        let tracked = TrackedValue::from(expected_df.clone());
+
+        let actual_df: DataFrame = tracked.into();
+
+        assert_eq!(actual_df.shape(), (5, 2));
+        assert_eq!(actual_df, expected_df);
     }
 }

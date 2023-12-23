@@ -6,6 +6,7 @@ use crate::types::trades::{calc_cost, Trade};
 use crate::traits::AsDataFrame;
 
 /// Represents a potential trade to be executed
+#[derive(Clone, Debug, PartialEq)]
 pub struct FutureTrade {
     side: Side,
     price: f64,
