@@ -29,10 +29,17 @@ pub trait Persistence {
 
 impl Persistence for Portfolio {
     fn save(&mut self, path: &Path) -> Result<(), Error> {
+        if !path.is_dir() {
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "path must be a directory"
+            ));
+        }
+
         // save executed trades into csv
         let file = OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(path.join(EXECUTED_TRADES_FILENAME))?;
         CsvWriter::new(file)
             .include_header(true)
@@ -41,7 +48,7 @@ impl Persistence for Portfolio {
         // save failed trades
         let file = OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(path.join(FAILED_TRADES_FILENAME))?;
         CsvWriter::new(file)
             .include_header(true)
@@ -60,7 +67,7 @@ impl Persistence for Portfolio {
         // save capital
         let file = OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(path.join(CAPITAL_FILENAME))?;
         CsvWriter::new(file)
             .include_header(true)
@@ -69,7 +76,7 @@ impl Persistence for Portfolio {
         // save assets
         let file = OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(path.join(ASSETS_FILENAME))?;
         CsvWriter::new(file)
             .include_header(true)
@@ -79,6 +86,13 @@ impl Persistence for Portfolio {
     }
 
     fn load(path: &Path) -> Result<Self, Error> {
+        if !path.is_dir() {
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "path must be a directory"
+            ));
+        }
+
         // load executed trades
         let file_path = path.join(EXECUTED_TRADES_FILENAME);
         let mut executed_trades =
@@ -247,6 +261,53 @@ mod tests {
         remove_temp_dir(suffix);
     }
 
+    /// Ensure that the save function does not panic when the files already exist
+    #[test]
+    fn test_save_when_existing() {
+        use std::env::temp_dir;
+
+        let suffix = "save_when_existing";
+        create_temp_dir(suffix);
+
+        let time = NaiveDateTime::from_timestamp_opt(0, 0).unwrap();
+
+        let mut portfolio = Portfolio::new(100.0, 100.0, time);
+        portfolio.add_executed_trade(
+            ExecutedTrade::new_without_cost(
+                "test_id".to_string(),
+                Side::Buy,
+                100.0,
+                1.0,
+                time + chrono::Duration::seconds(1)
+            )
+        );
+        portfolio.add_failed_trade(
+            FailedTrade::new(
+                ReasonCode::Unknown,
+                Side::Buy,
+                100.0,
+                1.0,
+                time + chrono::Duration::seconds(1)
+            )
+        );
+
+        let temp_dir = temp_dir();
+        let path = temp_dir.join(TEST_DIR).join(suffix);
+
+        portfolio.save(&path).unwrap();
+        portfolio.save(&path).unwrap();
+
+        remove_temp_dir(suffix);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_save_invalid_path() {
+        let time = NaiveDateTime::from_timestamp_opt(0, 0).unwrap();
+        let mut portfolio = Portfolio::new(100.0, 100.0, time);
+        portfolio.save(Path::new("invalid_path")).unwrap();
+    }
+
     #[test]
     fn test_load() {
         use std::env::temp_dir;
@@ -306,5 +367,11 @@ mod tests {
         assert_eq!(portfolio.open_positions.get(0).unwrap(), &expected_time);
 
         remove_temp_dir(suffix);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_load_invalid_path() {
+        Portfolio::load(Path::new("invalid_path")).unwrap();
     }
 }
