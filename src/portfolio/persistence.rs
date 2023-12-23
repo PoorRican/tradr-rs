@@ -19,11 +19,33 @@ const ASSETS_FILENAME: &str = "assets.csv";
 const DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 
 
+/// Introduces the ability to save and load portfolios from disk.
+///
+/// Portfolio will not be given the functionality of managing the specific
+/// instance directory. This is left to the object which initializes the object.
+/// The intention is to have a higher-level object which links the portfolio
+/// to other objects, such as a strategy, and manages the directory. That way
+/// multiple portfolios can be managed by a single object.
 pub trait Persistence {
     /// Save the portfolio to disk
+    ///
+    /// # Arguments
+    /// * `path` - The path to the directory in which to save the portfolio
+    ///
+    /// # Errors
+    /// * If the path is not a directory
+    /// * If there are any IO errors
     fn save(&mut self, path: &Path) -> Result<(), Error>;
 
     /// Load a portfolio from disk
+    ///
+    /// # Arguments
+    /// * `path` - The path to the directory in which to save the portfolio
+    ///
+    /// # Errors
+    /// * If the path is not a directory
+    /// * If there are any parsing errors
+    /// * If there are any IO errors
     fn load(path: &Path) -> Result<Self, Error> where Self: Sized;
 }
 
