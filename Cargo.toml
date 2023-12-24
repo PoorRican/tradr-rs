@@ -10,9 +10,10 @@ async-trait = { version = "0.1.75", features = [] }
 base64 = "0.13.1"
 chrono = { version = "0.4.31", features = [] }
 csv = "1.1.6"
-polars = { version = "0.35.4", features = ["temporal", "lazy"] }
+polars = { version = "0.35.4", features = ["temporal", "lazy", "semi_anti_join"] }
 polars-io = { version = "0.35.4", features = ["csv"] }
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
+ta = "0.5.0"
 tokio = { version = "1.35.1", features = ["full"] }
 reqwest = { version = "0.11.23", features = ["json"] }
