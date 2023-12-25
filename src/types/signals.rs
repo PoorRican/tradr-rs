@@ -22,6 +22,17 @@ impl Into<i32> for Signal {
     }
 }
 
+impl From<i32> for Signal {
+    fn from(value: i32) -> Self {
+        match value as isize {
+            SELL => Signal::Sell,
+            0 => Signal::Hold,
+            BUY => Signal::Buy,
+            _ => panic!("Invalid signal value: {}", value),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// Abstracts types of trades
 pub enum Side {

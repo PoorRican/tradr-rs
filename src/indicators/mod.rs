@@ -1,7 +1,8 @@
-mod bbands;
+pub mod bbands;
 
 use chrono::NaiveDateTime;
 use polars::prelude::{DataFrame, DataFrameJoinOps, JoinArgs, JoinType};
+use crate::types::Signal;
 
 /// Internal functions for indicators
 ///
@@ -94,6 +95,67 @@ pub trait IndicatorSignalHandler: IndicatorGraphHandler {
     /// # Returns
     /// A reference to the internal signal data dataframe
     fn get_signal_history(&self) -> &Option<DataFrame>;
+}
+
+pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
+
+    /// Process existing candle data
+    ///
+    /// This is the main interface for processing existing candle data. It is meant to be called once
+    /// at the beginning of the runtime for bootstrapping historical data, or for backtesting.
+    ///
+    /// # Arguments
+    /// * `candles` - Historical candle data
+    fn process_existing(&mut self, candles: &DataFrame) {
+        self.process_existing_candles(candles);
+        self.process_existing_data(candles);
+    }
+
+    /// Process new candle data
+    ///
+    /// This is the main interface for processing new candle data. It is meant to be called once
+    /// candle data is updated.
+    ///
+    /// # Arguments
+    /// * `candles` - The DataFrame with the new candle data
+    ///
+    /// # Panics
+    /// * If the DataFrame does not contain exactly one new row
+    fn process_new(&mut self, candles: &DataFrame) {
+        self.process_new_candles(candles);
+        self.process_new_data(candles);
+    }
+
+    /// Get the last signal
+    ///
+    /// Sort is not internally guaranteed.
+    ///
+    /// # Returns
+    /// * `Some` - The last signal in the signal history
+    /// * `None` - If there is no signal history
+    fn get_last_signal(&self) -> Option<Signal> {
+        if let Some(signal_history) = self.get_signal_history() {
+            let last_row = signal_history
+                .tail(Some(1));
+            let signal_val = last_row
+                .column("signal")
+                .unwrap()
+                .i32()
+                .unwrap()
+                .get(0)
+                .unwrap();
+            Some(Signal::from(signal_val))
+        } else {
+            None
+        }
+    }
+
+    /// Get signal history
+    ///
+    /// Exposes internal signal history for debugging or backtesting purposes.
+    fn get_signals(&self) -> &Option<DataFrame> {
+        self.get_signal_history()
+    }
 }
 
 /// Extract new rows from a time-series DataFrame

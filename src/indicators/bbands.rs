@@ -1,6 +1,4 @@
-use crate::indicators::{
-    extract_new_rows, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities,
-};
+use crate::indicators::{extract_new_rows, Indicator, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities};
 use crate::types::Signal;
 use chrono::NaiveDateTime;
 use polars::prelude::*;
@@ -232,6 +230,8 @@ impl IndicatorSignalHandler for BBands {
         &self.signals
     }
 }
+
+impl Indicator for BBands {}
 
 /// Unwrap a row from the indicator graph into a `BollingerBandsOutput`
 ///
