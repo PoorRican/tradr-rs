@@ -89,10 +89,12 @@ impl IndicatorGraphHandler for BBands {
         self.history = Some(df);
     }
 
-    fn process_new_candles(&mut self, candles: &DataFrame) {
-        let row = extract_new_rows(candles, self.history.as_ref().unwrap());
+    fn process_new_candles(&mut self, row: &DataFrame) {
+        // check for duplicated timestamps
+        let duplicated = extract_new_rows(row, self.history.as_ref().unwrap());
+        assert_eq!(duplicated.height(), 1, "Passed dataframe might have duplicated timestamps.");
 
-        // TODO: add the ability to handle all new rows
+        // check validity of row
         assert_eq!(row.height(), 1, "Row must be a single row.");
         assert_eq!(
             row.get_column_names(),
@@ -100,7 +102,7 @@ impl IndicatorGraphHandler for BBands {
             "Row has incorrect column names"
         );
 
-        // get the source column
+        // get the candle price from source column
         let data_point = row
             .column(SOURCE_COL_NAME)
             .unwrap()
@@ -173,19 +175,20 @@ impl IndicatorSignalHandler for BBands {
         );
     }
 
-    fn process_new_data(&mut self, candles: &DataFrame) {
+    fn process_new_data(&mut self, row: &DataFrame) {
         let graph_row = extract_new_rows(
             self.history.as_ref().unwrap(),
             self.signals.as_ref().unwrap(),
         );
 
-        let candle_row = extract_new_rows(candles, self.signals.as_ref().unwrap());
+        let duplicated = extract_new_rows(row, self.signals.as_ref().unwrap());
+        assert_eq!(duplicated.height(), 1, "Passed dataframe might have duplicated timestamps.");
 
         assert_eq!(graph_row.height(), 1, "Graph row must be a single row.");
-        assert_eq!(candle_row.height(), 1, "Candle row must be a single row.");
+        assert_eq!(row.height(), 1, "Candle row must be a single row.");
         assert_eq!(
             graph_row.column("time").unwrap().datetime().unwrap().get(0),
-            candle_row
+            row
                 .column("time")
                 .unwrap()
                 .datetime()
@@ -194,7 +197,7 @@ impl IndicatorSignalHandler for BBands {
             "Graph row and candle row must have the same timestamp"
         );
 
-        let candle_price = candle_row
+        let candle_price = row
             .column(SOURCE_COL_NAME)
             .unwrap()
             .f64()
@@ -214,7 +217,7 @@ impl IndicatorSignalHandler for BBands {
 
         // update the signals
         let df = df!(
-            "time" => candle_row.column("time").unwrap(),
+            "time" => row.column("time").unwrap(),
             "signal" => graph_row
         )
         .unwrap();
@@ -451,7 +454,7 @@ mod tests {
         // assert that the history aligns with candle dimensions
         assert_eq!(bb.history.as_ref().unwrap().height(), 5);
 
-        // append a row to the candles the run `process_new_row()`
+        // create a new candle row and run `process_new_row()`
         let new_row = df!(
             "time" => &[time.clone()],
             "open" => &[6],
@@ -461,9 +464,7 @@ mod tests {
             "volume" => &[6],
         )
         .unwrap();
-        let candles = candles.vstack(&new_row).unwrap();
-
-        bb.process_new_candles(&candles);
+        bb.process_new_candles(&new_row);
 
         // assert that `history` has been updated with new row
         let history = bb.history.as_ref().unwrap();
@@ -590,38 +591,28 @@ mod tests {
         assert_eq!(bb.signals.as_ref().unwrap().height(), 5);
 
         // update history with new row
-        let new_row = df!(
+        let new_history_row = df!(
             "time" => &[time.clone()],
             "lower" => &[1.0],
             "middle" => &[1.5],
             "upper" => &[2.0],
         )
         .unwrap();
-        let history = bb.history.as_ref().unwrap().vstack(&new_row).unwrap();
+        let history = bb.history.as_ref().unwrap().vstack(&new_history_row).unwrap();
         bb.history = Some(history);
 
-        let date_range = polars::prelude::date_range(
-            "time",
-            time - chrono::Duration::minutes(5),
-            time,
-            Duration::parse("1m"),
-            ClosedWindow::Both,
-            TimeUnit::Milliseconds,
-            None,
-        )
-        .unwrap();
-        let candles = df!(
-            "time" => date_range,
-            "open" => &[1, 2, 3, 4, 5, 6],
-            "high" => &[1, 2, 3, 4, 5, 6],
-            "low" => &[1, 2, 3, 4, 5, 6],
-            "close" => &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            "volume" => &[1, 2, 3, 4, 5, 6],
+        let new_row = df!(
+            "time" => &[time],
+            "open" => &[6],
+            "high" => &[6],
+            "low" => &[6],
+            "close" => &[6.0],
+            "volume" => &[6],
         )
         .unwrap();
 
         // call process_new_data() and assert that signals have been updated
-        bb.process_new_data(&candles);
+        bb.process_new_data(&new_row);
 
         assert_eq!(bb.signals.as_ref().unwrap().height(), 6);
         assert_eq!(

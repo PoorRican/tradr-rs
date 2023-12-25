@@ -70,15 +70,12 @@ trait IndicatorGraphHandler: IndicatorUtilities {
 
     /// Update processed indicator data with new candle data rows
     ///
-    /// Internally, [`extract_new_rows()`] is called to get the new candle data, then the new candle data is
-    /// processed and appended to the time-series DataFrame
-    ///
     /// # Arguments
-    /// * `candles` - The DataFrame with the candle data. Must contain one new row.
+    /// * `row` - A single row containing the new candle data
     ///
     /// # Panics
     /// * If the DataFrame does not contain exactly one new row
-    fn process_new_candles(&mut self, candles: &DataFrame);
+    fn process_new_candles(&mut self, row: &DataFrame);
 
     /// Get the entirety of the calculated indicator data
     ///
@@ -101,15 +98,12 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
 
     /// Update processed signal data with a new indicator graph row
     ///
-    /// Internally, [`extract_new_rows()`] is called to get the new indicator graph row, then the row is
-    /// processed and appended to the time-series DataFrame
-    ///
     /// # Arguments
-    /// * `candles` - The DataFrame with the candle data and is used to determine the signal.
+    /// * `row` - A single row containing the new candle data
     ///
     /// # Panics
     /// * If the DataFrame does not contain exactly one new row
-    fn process_new_data(&mut self, candles: &DataFrame);
+    fn process_new_data(&mut self, row: &DataFrame);
 
     /// Get the entirety of the calculated signal data
     ///
@@ -147,17 +141,18 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
 
     /// Process new candle data
     ///
-    /// This is the main interface for processing new candle data. It is meant to be called once
-    /// candle data is updated.
+    /// This is the main interface for processing new candle data. It is meant to be called with
+    /// new candle data as it is received from the market.
     ///
     /// # Arguments
-    /// * `candles` - The DataFrame with the new candle data
+    /// * `row` - New candle data containing exactly one new row
     ///
     /// # Panics
     /// * If the DataFrame does not contain exactly one new row
-    fn process_new(&mut self, candles: &DataFrame) {
-        self.process_new_candles(candles);
-        self.process_new_data(candles);
+    fn process_new(&mut self, row: &DataFrame) {
+        assert_eq!(row.height(), 1, "DataFrame must contain exactly one new row");
+        self.process_new_candles(row);
+        self.process_new_data(row);
     }
 
     /// Get the last signal
