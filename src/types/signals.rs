@@ -12,6 +12,16 @@ pub enum Signal {
     Buy = BUY,
 }
 
+impl Into<i32> for Signal {
+    fn into(self) -> i32 {
+        match self {
+            Signal::Buy => BUY as i32,
+            Signal::Hold => 0,
+            Signal::Sell => SELL as i32,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// Abstracts types of trades
 pub enum Side {
