@@ -18,7 +18,7 @@ struct BBands {
 
     indicator: BollingerBands,
     history: Option<DataFrame>,
-    signals: Option<DataFrame>
+    signals: Option<DataFrame>,
 }
 
 impl BBands {
@@ -28,7 +28,7 @@ impl BBands {
             multiplier,
             history: None,
             indicator: BollingerBands::new(period, multiplier).unwrap(),
-            signals: None
+            signals: None,
         }
     }
 }
@@ -39,7 +39,11 @@ impl IndicatorUtilities for BBands {
         self.indicator = BollingerBands::new(self.period, self.multiplier).unwrap();
     }
 
-    fn convert_output_to_dataframe(&self, output: Self::Output, timestamp: NaiveDateTime) -> DataFrame {
+    fn convert_output_to_dataframe(
+        &self,
+        output: Self::Output,
+        timestamp: NaiveDateTime,
+    ) -> DataFrame {
         let lower = output.lower;
         let middle = output.average;
         let upper = output.upper;
@@ -49,11 +53,11 @@ impl IndicatorUtilities for BBands {
             "lower" => &[lower],
             "middle" => &[middle],
             "upper" => &[upper],
-        ).unwrap();
+        )
+        .unwrap();
 
         df
     }
-
 }
 
 impl Default for BBands {
@@ -88,29 +92,35 @@ impl IndicatorGraphHandler for BBands {
     }
 
     fn process_new_candles(&mut self, candles: &DataFrame) {
-        let row = extract_new_rows(
-            candles,
-            self.history.as_ref().unwrap()
-        );
+        let row = extract_new_rows(candles, self.history.as_ref().unwrap());
 
         // TODO: add the ability to handle all new rows
-        assert_eq!(row.height(),
-                   1,
-                   "Row must be a single row.");
-        assert_eq!(row.get_column_names(),
-                   ["time", "open", "high", "low", "close", "volume"],
-                   "Row has incorrect column names");
+        assert_eq!(row.height(), 1, "Row must be a single row.");
+        assert_eq!(
+            row.get_column_names(),
+            ["time", "open", "high", "low", "close", "volume"],
+            "Row has incorrect column names"
+        );
 
         // get the source column
         let data_point = row
-            .column(SOURCE_COL_NAME).unwrap()
-            .f64().unwrap().get(0).unwrap();
+            .column(SOURCE_COL_NAME)
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
 
         // get the timestamp
-        let timestamp = NaiveDateTime::from_timestamp_millis(row
-            .column("time").unwrap()
-            .datetime().unwrap().get(0).unwrap()
-        ).unwrap();
+        let timestamp = NaiveDateTime::from_timestamp_millis(
+            row.column("time")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+        )
+        .unwrap();
 
         // update the indicator
         let output = self.indicator.next(data_point);
@@ -145,7 +155,6 @@ impl IndicatorSignalHandler for BBands {
             .into_iter()
             .zip(candle_col.iter())
             .map(|(series, close_price)| {
-
                 let close_price = if let AnyValue::Float64(inner) = close_price {
                     inner
                 } else {
@@ -167,30 +176,33 @@ impl IndicatorSignalHandler for BBands {
     }
 
     fn process_new_data(&mut self, candles: &DataFrame) {
-
         let graph_row = extract_new_rows(
             self.history.as_ref().unwrap(),
-            self.signals.as_ref().unwrap()
+            self.signals.as_ref().unwrap(),
         );
 
-        let candle_row = extract_new_rows(
-            candles,
-            self.signals.as_ref().unwrap()
-        );
+        let candle_row = extract_new_rows(candles, self.signals.as_ref().unwrap());
 
-        assert_eq!(graph_row.height(),
-                   1,
-                   "Graph row must be a single row.");
-        assert_eq!(candle_row.height(),
-                   1,
-                   "Candle row must be a single row.");
-        assert_eq!(graph_row.column("time").unwrap().datetime().unwrap().get(0),
-                   candle_row.column("time").unwrap().datetime().unwrap().get(0),
-                   "Graph row and candle row must have the same timestamp");
+        assert_eq!(graph_row.height(), 1, "Graph row must be a single row.");
+        assert_eq!(candle_row.height(), 1, "Candle row must be a single row.");
+        assert_eq!(
+            graph_row.column("time").unwrap().datetime().unwrap().get(0),
+            candle_row
+                .column("time")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0),
+            "Graph row and candle row must have the same timestamp"
+        );
 
         let candle_price = candle_row
-            .column(SOURCE_COL_NAME).unwrap()
-            .f64().unwrap().get(0).unwrap();
+            .column(SOURCE_COL_NAME)
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
 
         // process the graph row
         let graph_row = graph_row
@@ -206,7 +218,8 @@ impl IndicatorSignalHandler for BBands {
         let df = df!(
             "time" => candle_row.column("time").unwrap(),
             "signal" => graph_row
-        ).unwrap();
+        )
+        .unwrap();
 
         if let Some(ref mut signals) = self.signals {
             *signals = signals.vstack(&df).unwrap();
@@ -339,7 +352,6 @@ mod tests {
         assert_eq!(bb.indicator.multiplier(), 4.0);
     }
 
-
     #[test]
     fn test_process_existing_candles() {
         let mut bb = super::BBands::new(4, 2.0);
@@ -353,8 +365,9 @@ mod tests {
             Duration::parse("1m"),
             ClosedWindow::Left,
             TimeUnit::Milliseconds,
-            None
-        ).unwrap();
+            None,
+        )
+        .unwrap();
         let candles = df!(
             "time" => date_range.clone(),
             "open" => &[1, 2, 3, 4, 5],
@@ -362,7 +375,8 @@ mod tests {
             "low" => &[1, 2, 3, 4, 5],
             "close" => &[1.0, 2.0, 3.0, 4.0, 5.0],
             "volume" => &[1, 2, 3, 4, 5],
-        ).unwrap();
+        )
+        .unwrap();
 
         bb.process_existing_candles(&candles);
 
@@ -371,18 +385,38 @@ mod tests {
         assert_eq!(history.shape(), (5, 4));
 
         for i in 0..6 {
-            assert_eq!(history.column("time").unwrap().datetime().unwrap().get(i),
-                       date_range.get(i));
+            assert_eq!(
+                history.column("time").unwrap().datetime().unwrap().get(i),
+                date_range.get(i)
+            );
         }
 
-        assert_eq!(history.column("lower").unwrap().f64().unwrap().get(0), Some(1.0));
-        assert_eq!(history.column("lower").unwrap().f64().unwrap().get(1), Some(0.5));
+        assert_eq!(
+            history.column("lower").unwrap().f64().unwrap().get(0),
+            Some(1.0)
+        );
+        assert_eq!(
+            history.column("lower").unwrap().f64().unwrap().get(1),
+            Some(0.5)
+        );
 
-        assert_eq!(history.column("middle").unwrap().f64().unwrap().get(0), Some(1.0));
-        assert_eq!(history.column("middle").unwrap().f64().unwrap().get(1), Some(1.5));
+        assert_eq!(
+            history.column("middle").unwrap().f64().unwrap().get(0),
+            Some(1.0)
+        );
+        assert_eq!(
+            history.column("middle").unwrap().f64().unwrap().get(1),
+            Some(1.5)
+        );
 
-        assert_eq!(history.column("upper").unwrap().f64().unwrap().get(0), Some(1.0));
-        assert_eq!(history.column("upper").unwrap().f64().unwrap().get(1), Some(2.5));
+        assert_eq!(
+            history.column("upper").unwrap().f64().unwrap().get(0),
+            Some(1.0)
+        );
+        assert_eq!(
+            history.column("upper").unwrap().f64().unwrap().get(1),
+            Some(2.5)
+        );
     }
 
     #[test]
@@ -396,8 +430,9 @@ mod tests {
             Duration::parse("1m"),
             ClosedWindow::Left,
             TimeUnit::Milliseconds,
-            None
-        ).unwrap();
+            None,
+        )
+        .unwrap();
         let mut candles = df!(
             "time" => date_range,
             "open" => &[1, 2, 3, 4, 5],
@@ -405,7 +440,8 @@ mod tests {
             "low" => &[1, 2, 3, 4, 5],
             "close" => &[1.0, 2.0, 3.0, 4.0, 5.0],
             "volume" => &[1, 2, 3, 4, 5],
-        ).unwrap();
+        )
+        .unwrap();
 
         // create indicator and run `process_existing_candles()`
         let mut bb = super::BBands::new(4, 2.0);
@@ -423,7 +459,8 @@ mod tests {
             "low" => &[6],
             "close" => &[6.0],
             "volume" => &[6],
-        ).unwrap();
+        )
+        .unwrap();
         let candles = candles.vstack(&new_row).unwrap();
 
         bb.process_new_candles(&candles);
@@ -525,7 +562,8 @@ mod tests {
             ClosedWindow::Left,
             TimeUnit::Milliseconds,
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         // create history
         let history = df!(
@@ -533,13 +571,15 @@ mod tests {
             "lower" => &[1.0, 1.0, 1.0, 1.0, 1.0],
             "middle" => &[1.5, 1.5, 1.5, 1.5, 1.5],
             "upper" => &[2.0, 2.0, 2.0, 2.0, 2.0],
-        ).unwrap();
+        )
+        .unwrap();
 
         // create signals
         let signals = df!(
             "time" => date_range.clone(),
             "signal" => &[1, 1, 0, 0, -1],
-        ).unwrap();
+        )
+        .unwrap();
 
         // create indicator
         let mut bb = super::BBands::new(4, 2.0);
@@ -555,7 +595,8 @@ mod tests {
             "lower" => &[1.0],
             "middle" => &[1.5],
             "upper" => &[2.0],
-        ).unwrap();
+        )
+        .unwrap();
         let history = bb.history.as_ref().unwrap().vstack(&new_row).unwrap();
         bb.history = Some(history);
 
@@ -567,7 +608,8 @@ mod tests {
             ClosedWindow::Both,
             TimeUnit::Milliseconds,
             None,
-        ).unwrap();
+        )
+        .unwrap();
         let candles = df!(
             "time" => date_range,
             "open" => &[1, 2, 3, 4, 5, 6],
@@ -575,18 +617,35 @@ mod tests {
             "low" => &[1, 2, 3, 4, 5, 6],
             "close" => &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             "volume" => &[1, 2, 3, 4, 5, 6],
-        ).unwrap();
+        )
+        .unwrap();
 
         // call process_new_data() and assert that signals have been updated
         bb.process_new_data(&candles);
 
         assert_eq!(bb.signals.as_ref().unwrap().height(), 6);
         assert_eq!(
-            bb.signals.as_ref().unwrap().column("time").unwrap().datetime().unwrap().get(5).unwrap(),
+            bb.signals
+                .as_ref()
+                .unwrap()
+                .column("time")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(5)
+                .unwrap(),
             time.timestamp_millis()
         );
         assert_eq!(
-            bb.signals.as_ref().unwrap().column("signal").unwrap().i32().unwrap().get(5).unwrap(),
+            bb.signals
+                .as_ref()
+                .unwrap()
+                .column("signal")
+                .unwrap()
+                .i32()
+                .unwrap()
+                .get(5)
+                .unwrap(),
             Signal::Sell as i32
         );
     }

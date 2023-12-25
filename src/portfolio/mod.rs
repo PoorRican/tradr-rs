@@ -1,19 +1,19 @@
-mod tracked;
 mod assets;
 mod capital;
-mod trade;
-mod position;
 mod persistence;
+mod position;
+mod tracked;
+mod trade;
 
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
-pub use trade::TradeHandlers;
 pub use position::PositionHandlers;
+pub use trade::TradeHandlers;
 
-use chrono::{Duration, NaiveDateTime, Utc};
-use polars::prelude::DataFrame;
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
+use chrono::{Duration, NaiveDateTime, Utc};
+use polars::prelude::DataFrame;
 
 pub const DEFAULT_LIMIT: usize = 4;
 pub const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
@@ -39,10 +39,12 @@ pub struct Portfolio {
 
 impl Portfolio {
     pub fn new<T>(assets: f64, capital: f64, point: T) -> Portfolio
-    where T: Into<Option<NaiveDateTime>> {
-        let point = point.into()
-            .unwrap_or_else(
-                || NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
+    where
+        T: Into<Option<NaiveDateTime>>,
+    {
+        let point = point.into().unwrap_or_else(|| {
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+        });
 
         Portfolio {
             failed_trades: DataFrame::empty(),
@@ -54,7 +56,7 @@ impl Portfolio {
             capital_ts: TrackedValue::with_initial(capital, point),
             open_positions_limit: DEFAULT_LIMIT,
             timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
-            fee_calculator: None
+            fee_calculator: None,
         }
     }
 
@@ -75,13 +77,15 @@ impl Portfolio {
             capital_ts,
             open_positions_limit: DEFAULT_LIMIT,
             timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
-            fee_calculator: None
+            fee_calculator: None,
         }
     }
 
     /// Builder method for the `fee_calculator` field
     pub fn add_fee_calculator<T>(mut self, fee_calculator: T) -> Self
-    where T: FeeCalculator + 'static {
+    where
+        T: FeeCalculator + 'static,
+    {
         self.fee_calculator = Some(Box::new(fee_calculator));
         self
     }
@@ -114,40 +118,26 @@ impl Portfolio {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::portfolio::{
-        assets::AssetHandlers,
-        capital::CapitalHandlers
-    };
+    use crate::portfolio::{assets::AssetHandlers, capital::CapitalHandlers};
     use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode};
 
     #[test]
     fn test_with_data() {
-        use chrono::NaiveDateTime;
         use crate::types::Side;
+        use chrono::NaiveDateTime;
 
         let assets = 100.0;
         let capital = 100.0;
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let mut portfolio = Portfolio::new(assets, capital, point);
-        let trade = FutureTrade::new(
-            Side::Buy,
-            100.0,
-            1.0,
-            point + Duration::seconds(1)
-        );
-        let executed_trade = ExecutedTrade::with_future_trade(
-            "id".to_string(),
-            trade.clone()
-        );
-        let failed_trade = FailedTrade::with_future_trade(
-            ReasonCode::MarketRejection,
-            trade.clone()
-        );
+        let trade = FutureTrade::new(Side::Buy, 100.0, 1.0, point + Duration::seconds(1));
+        let executed_trade = ExecutedTrade::with_future_trade("id".to_string(), trade.clone());
+        let failed_trade =
+            FailedTrade::with_future_trade(ReasonCode::MarketRejection, trade.clone());
 
         portfolio.add_executed_trade(executed_trade);
         portfolio.add_failed_trade(failed_trade);
@@ -157,7 +147,7 @@ mod tests {
             portfolio.executed_trades,
             portfolio.open_positions,
             portfolio.assets_ts,
-            portfolio.capital_ts
+            portfolio.capital_ts,
         );
 
         // assert that assets and capital `TrackedValues` were initialized correctly
@@ -167,7 +157,10 @@ mod tests {
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
         assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
-        assert_eq!(portfolio.timeout, Duration::minutes(DEFAULT_TIMEOUT_MINUTES));
+        assert_eq!(
+            portfolio.timeout,
+            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
+        );
 
         // assert that the trade storage is empty
         assert_eq!(portfolio.executed_trades.height(), 1);
@@ -192,7 +185,10 @@ mod tests {
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
         assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
-        assert_eq!(portfolio.timeout, Duration::minutes(DEFAULT_TIMEOUT_MINUTES));
+        assert_eq!(
+            portfolio.timeout,
+            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
+        );
 
         // assert that the trade storage is empty
         assert!(portfolio.failed_trades.is_empty());
@@ -231,7 +227,10 @@ mod tests {
     #[test]
     fn test_set_timeout() {
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
-        assert_eq!(portfolio.timeout, Duration::minutes(DEFAULT_TIMEOUT_MINUTES));
+        assert_eq!(
+            portfolio.timeout,
+            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
+        );
 
         portfolio.set_timeout(10);
         assert_eq!(portfolio.timeout, Duration::minutes(10));

@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 
 /// create temp dir for testing
 pub fn create_temp_dir(dir: &Path) -> PathBuf {
-
     let temp_dir = temp_dir();
     let path = temp_dir.join(dir);
 

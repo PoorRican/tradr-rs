@@ -1,12 +1,12 @@
-use std::fs::OpenOptions;
-use std::io::Error;
-use std::path::Path;
+use crate::traits::AsDataFrame;
+use crate::types::Candle;
 use polars::error::PolarsResult;
 use polars::frame::{DataFrame, UniqueKeepStrategy};
 use polars_io::prelude::{CsvReader, CsvWriter};
 use polars_io::{SerReader, SerWriter};
-use crate::types::Candle;
-use crate::traits::AsDataFrame;
+use std::fs::OpenOptions;
+use std::io::Error;
+use std::path::Path;
 
 const ONE_MINUTE_FN: &str = "1m.csv";
 const FIVE_MINUTES_FN: &str = "5m.csv";
@@ -15,7 +15,6 @@ const THIRTY_MINUTES_FN: &str = "30m.csv";
 const ONE_HOUR_FN: &str = "1h.csv";
 const SIX_HOURS_FN: &str = "6h.csv";
 const DAILY_FN: &str = "daily.csv";
-
 
 struct CandleHolder {
     pub one_minute: Option<DataFrame>,
@@ -81,7 +80,7 @@ impl CandleHolder {
             Some(existing) => {
                 let updated = append_candles(existing, new_candles);
                 self.one_minute = Some(updated?);
-            },
+            }
             None => {
                 self.one_minute = Some(new_candles);
             }
@@ -95,7 +94,7 @@ impl CandleHolder {
             Some(existing) => {
                 let updated = append_candles(existing, new_candles);
                 self.five_minutes = Some(updated?);
-            },
+            }
             None => {
                 self.five_minutes = Some(new_candles);
             }
@@ -109,7 +108,7 @@ impl CandleHolder {
             Some(existing) => {
                 let updated = append_candles(existing, new_candles);
                 self.fifteen_minutes = Some(updated?);
-            },
+            }
             None => {
                 self.fifteen_minutes = Some(new_candles);
             }
@@ -123,7 +122,7 @@ impl CandleHolder {
             Some(existing) => {
                 let updated = append_candles(existing, new_candles);
                 self.thirty_minutes = Some(updated?);
-            },
+            }
             None => {
                 self.thirty_minutes = Some(new_candles);
             }
@@ -137,7 +136,7 @@ impl CandleHolder {
             Some(existing) => {
                 let updated = append_candles(existing, new_candles);
                 self.one_hour = Some(updated?);
-            },
+            }
             None => {
                 self.one_hour = Some(new_candles);
             }
@@ -151,7 +150,7 @@ impl CandleHolder {
             Some(existing) => {
                 let updated = append_candles(existing, new_candles);
                 self.six_hours = Some(updated?);
-            },
+            }
             None => {
                 self.six_hours = Some(new_candles);
             }
@@ -165,7 +164,7 @@ impl CandleHolder {
             Some(existing) => {
                 let updated = append_candles(existing, new_candles);
                 self.daily = Some(updated?);
-            },
+            }
             None => {
                 self.daily = Some(new_candles);
             }
@@ -177,7 +176,7 @@ impl CandleHolder {
         if !path.is_dir() {
             return Err(Error::new(
                 std::io::ErrorKind::InvalidInput,
-                "path must be a directory"
+                "path must be a directory",
             ));
         }
 
@@ -215,7 +214,7 @@ impl CandleHolder {
         if !path.is_dir() {
             return Err(Error::new(
                 std::io::ErrorKind::InvalidInput,
-                "path must be a directory"
+                "path must be a directory",
             ));
         }
 
@@ -249,14 +248,13 @@ impl CandleHolder {
 
         Ok(())
     }
-
 }
 
 fn save_candles(file_path: &Path, data: &mut DataFrame) -> Result<(), Error> {
     if file_path.is_dir() {
         return Err(Error::new(
             std::io::ErrorKind::InvalidInput,
-            "A directory was passed. Path must be a file"
+            "A directory was passed. Path must be a file",
         ));
     }
 
@@ -276,17 +274,16 @@ fn load_candles(file_path: &Path) -> Result<DataFrame, Error> {
     if !file_path.is_file() {
         return Err(Error::new(
             std::io::ErrorKind::InvalidInput,
-            "path must be a file"
+            "path must be a file",
         ));
     }
 
-    let df =
-        CsvReader::from_path(file_path)
-            .unwrap()
-            .has_header(true)
-            .with_try_parse_dates(true)
-            .finish()
-            .unwrap();
+    let df = CsvReader::from_path(file_path)
+        .unwrap()
+        .has_header(true)
+        .with_try_parse_dates(true)
+        .finish()
+        .unwrap();
     Ok(df)
 }
 
@@ -303,21 +300,19 @@ fn load_candles(file_path: &Path) -> Result<DataFrame, Error> {
 fn append_candles(existing: &DataFrame, new_candles: DataFrame) -> PolarsResult<DataFrame> {
     let mut appended = existing.vstack(&new_candles)?;
 
-    appended.unique_stable(
-        Some(&["time".to_string()]),
-        UniqueKeepStrategy::Last,
-        None
-    )
+    appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)
 }
-
 
 #[cfg(test)]
 mod tests {
+    use crate::holder::{
+        load_candles, CandleHolder, DAILY_FN, FIFTEEN_MINUTES_FN, FIVE_MINUTES_FN, ONE_HOUR_FN,
+        ONE_MINUTE_FN, SIX_HOURS_FN, THIRTY_MINUTES_FN,
+    };
+    use crate::utils::create_temp_dir;
+    use polars::prelude::*;
     use std::fs::remove_dir_all;
     use std::path::Path;
-    use polars::prelude::*;
-    use crate::holder::{CandleHolder, DAILY_FN, FIFTEEN_MINUTES_FN, FIVE_MINUTES_FN, load_candles, ONE_HOUR_FN, ONE_MINUTE_FN, SIX_HOURS_FN, THIRTY_MINUTES_FN};
-    use crate::utils::create_temp_dir;
 
     const TEST_DIR: &str = "candle_holder_testing";
 
@@ -329,7 +324,8 @@ mod tests {
             "low" => &[1.0, 2.0, 3.0, 4.0],
             "close" => &[1.0, 2.0, 3.0, 4.0],
             "volume" => &[1.0, 2.0, 3.0, 4.0]
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn create_holder() -> (DataFrame, CandleHolder) {
@@ -436,7 +432,6 @@ mod tests {
         remove_dir_all(&path).unwrap();
     }
 
-
     #[test]
     fn test_update_candles() {
         // create a data frame with 4 rows
@@ -450,7 +445,8 @@ mod tests {
             "low" => &[5.0, 6.0],
             "close" => &[5.0, 6.0],
             "volume" => &[5.0, 6.0]
-        ).unwrap();
+        )
+        .unwrap();
 
         // update the existing data frame with the new data frame
         let updated = super::append_candles(&df, new_df).unwrap();
@@ -459,6 +455,15 @@ mod tests {
         assert_eq!(updated.shape(), (5, 6));
 
         // assert that the third row contains values of 5.0, which came from the new data frame
-        assert_eq!(updated.column("open").unwrap().f64().unwrap().get(3).unwrap(), 5.0);
+        assert_eq!(
+            updated
+                .column("open")
+                .unwrap()
+                .f64()
+                .unwrap()
+                .get(3)
+                .unwrap(),
+            5.0
+        );
     }
 }

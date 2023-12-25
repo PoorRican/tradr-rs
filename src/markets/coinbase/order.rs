@@ -96,12 +96,7 @@ pub struct CoinbaseOrderRequest {
 }
 
 impl CoinbaseOrderRequest {
-    pub fn new_limit_order(
-        side: Side,
-        product_id: String,
-        price: f64,
-        size: f64) -> Self
-    {
+    pub fn new_limit_order(side: Side, product_id: String, price: f64, size: f64) -> Self {
         Self {
             profile_id: None,
             r#type: CoinbaseMarketOrderType::Limit,
@@ -118,10 +113,7 @@ impl CoinbaseOrderRequest {
         }
     }
 
-    pub fn with_future_trade(
-        trade: FutureTrade,
-        product_id: String,
-    ) -> Self {
+    pub fn with_future_trade(trade: FutureTrade, product_id: String) -> Self {
         Self::new_limit_order(
             trade.get_side(),
             product_id,
@@ -221,14 +213,15 @@ pub struct CoinbaseOrderResponse {
 
 impl Into<ExecutedTrade> for CoinbaseOrderResponse {
     fn into(self) -> ExecutedTrade {
-        let point = NaiveDateTime::parse_from_str(&self.created_at, "%Y-%m-%dT%H:%M:%S%.fZ").unwrap();
+        let point =
+            NaiveDateTime::parse_from_str(&self.created_at, "%Y-%m-%dT%H:%M:%S%.fZ").unwrap();
         ExecutedTrade::new(
             self.id.to_string(),
             self.side,
             self.price,
             self.size,
             self.filled_size,
-            point
+            point,
         )
     }
 }
@@ -306,10 +299,7 @@ mod order_request_tests {
             chrono::Utc::now().naive_utc(),
         );
 
-        let order = CoinbaseOrderRequest::with_future_trade(
-            trade,
-            product_id.clone(),
-        );
+        let order = CoinbaseOrderRequest::with_future_trade(trade, product_id.clone());
 
         assert_eq!(order.side, super::Side::Buy);
         assert_eq!(order.product_id, product_id);
@@ -324,10 +314,7 @@ mod order_request_tests {
             chrono::Utc::now().naive_utc(),
         );
 
-        let order = CoinbaseOrderRequest::with_future_trade(
-            trade,
-            product_id.clone(),
-        );
+        let order = CoinbaseOrderRequest::with_future_trade(trade, product_id.clone());
 
         assert_eq!(order.side, super::Side::Sell);
         assert_eq!(order.product_id, product_id);
@@ -350,10 +337,10 @@ mod order_request_tests {
 
 #[cfg(test)]
 mod order_response_tests {
-    use chrono::NaiveDateTime;
-    use crate::types::{ExecutedTrade, Trade};
     use super::{CoinbaseMarketOrderType, CoinbaseOrderResponse};
     use crate::types::Side;
+    use crate::types::{ExecutedTrade, Trade};
+    use chrono::NaiveDateTime;
 
     #[test]
     fn test_order_response_into_executed_trade() {
@@ -391,6 +378,9 @@ mod order_response_tests {
         assert_eq!(trade.get_side(), order.side);
         assert_eq!(trade.get_price(), order.price);
         assert_eq!(trade.get_quantity(), order.size);
-        assert_eq!(*trade.get_point(), NaiveDateTime::parse_from_str(&order.created_at, "%Y-%m-%dT%H:%M:%S%.fZ").unwrap());
+        assert_eq!(
+            *trade.get_point(),
+            NaiveDateTime::parse_from_str(&order.created_at, "%Y-%m-%dT%H:%M:%S%.fZ").unwrap()
+        );
     }
 }

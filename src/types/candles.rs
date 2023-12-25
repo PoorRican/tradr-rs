@@ -1,9 +1,8 @@
+use crate::traits::AsDataFrame;
 use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 use serde::{Deserialize, Serialize};
-use crate::traits::AsDataFrame;
-
 
 /// Abstracts a candlestick
 #[derive(Serialize, Debug, PartialEq)]
@@ -20,8 +19,8 @@ pub struct Candle {
 
 impl<'de> Deserialize<'de> for Candle {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         let arr = <[f64; 6]>::deserialize(deserializer)?;
 
@@ -43,7 +42,6 @@ impl<'de> Deserialize<'de> for Candle {
     }
 }
 
-
 impl AsDataFrame for Candle {
     fn as_dataframe(&self) -> DataFrame {
         DataFrame::new(vec![
@@ -53,7 +51,8 @@ impl AsDataFrame for Candle {
             Series::new("low", vec![self.low]),
             Series::new("close", vec![self.close]),
             Series::new("volume", vec![self.volume]),
-        ]).unwrap()
+        ])
+        .unwrap()
     }
 }
 
@@ -82,10 +81,10 @@ impl AsDataFrame for Vec<Candle> {
             Series::new("low", low),
             Series::new("close", close),
             Series::new("volume", volume),
-        ]).unwrap()
+        ])
+        .unwrap()
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -106,24 +105,39 @@ mod test {
         };
         let df = candle.as_dataframe();
         assert_eq!(df.shape(), (1, 6));
-        assert_eq!(df.get_column_names(), &["time", "open", "high", "low", "close", "volume"]);
-        assert_eq!(df.column("time").unwrap().datetime().unwrap().get(0).unwrap(),
-                   time.timestamp_millis());
+        assert_eq!(
+            df.get_column_names(),
+            &["time", "open", "high", "low", "close", "volume"]
+        );
+        assert_eq!(
+            df.column("time")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+            time.timestamp_millis()
+        );
         assert_eq!(
             df.column("open").unwrap().get(0).unwrap(),
-            AnyValue::Float64(candle.open));
+            AnyValue::Float64(candle.open)
+        );
         assert_eq!(
             df.column("high").unwrap().get(0).unwrap(),
-            AnyValue::Float64(candle.high));
+            AnyValue::Float64(candle.high)
+        );
         assert_eq!(
             df.column("low").unwrap().get(0).unwrap(),
-            AnyValue::Float64(candle.low));
+            AnyValue::Float64(candle.low)
+        );
         assert_eq!(
             df.column("close").unwrap().get(0).unwrap(),
-            AnyValue::Float64(candle.close));
+            AnyValue::Float64(candle.close)
+        );
         assert_eq!(
             df.column("volume").unwrap().get(0).unwrap(),
-            AnyValue::Float64(candle.volume));
+            AnyValue::Float64(candle.volume)
+        );
     }
 
     #[test]
@@ -144,25 +158,40 @@ mod test {
         }
         let df = candles.as_dataframe();
         assert_eq!(df.shape(), (10, 6));
-        assert_eq!(df.get_column_names(), &["time", "open", "high", "low", "close", "volume"]);
+        assert_eq!(
+            df.get_column_names(),
+            &["time", "open", "high", "low", "close", "volume"]
+        );
         for i in 0..10 {
-            assert_eq!(df.column("time").unwrap().datetime().unwrap().get(i).unwrap(),
-                       candles[i].time.timestamp_millis());
+            assert_eq!(
+                df.column("time")
+                    .unwrap()
+                    .datetime()
+                    .unwrap()
+                    .get(i)
+                    .unwrap(),
+                candles[i].time.timestamp_millis()
+            );
             assert_eq!(
                 df.column("open").unwrap().get(i).unwrap(),
-                AnyValue::Float64(candles[i].open));
+                AnyValue::Float64(candles[i].open)
+            );
             assert_eq!(
                 df.column("high").unwrap().get(i).unwrap(),
-                AnyValue::Float64(candles[i].high));
+                AnyValue::Float64(candles[i].high)
+            );
             assert_eq!(
                 df.column("low").unwrap().get(i).unwrap(),
-                AnyValue::Float64(candles[i].low));
+                AnyValue::Float64(candles[i].low)
+            );
             assert_eq!(
                 df.column("close").unwrap().get(i).unwrap(),
-                AnyValue::Float64(candles[i].close));
+                AnyValue::Float64(candles[i].close)
+            );
             assert_eq!(
                 df.column("volume").unwrap().get(i).unwrap(),
-                AnyValue::Float64(candles[i].volume));
+                AnyValue::Float64(candles[i].volume)
+            );
         }
     }
 }

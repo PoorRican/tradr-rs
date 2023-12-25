@@ -1,21 +1,19 @@
 extern crate tradr;
 
-use std::collections::VecDeque;
 use chrono::{Duration, NaiveDateTime, Utc};
+use std::collections::VecDeque;
 use tradr::portfolio::{
-    DEFAULT_LIMIT, Portfolio,
-    CapitalHandlers, AssetHandlers, TradeHandlers, PositionHandlers
+    AssetHandlers, CapitalHandlers, Portfolio, PositionHandlers, TradeHandlers, DEFAULT_LIMIT,
 };
-use tradr::types::{
-    Side, ExecutedTrade, FutureTrade, Trade
-};
+use tradr::types::{ExecutedTrade, FutureTrade, Side, Trade};
 
 /// Simulates a typical scenario in which a portfolio is created, and then
 /// a series of trades are executed, some of which are profitable and some of which are not.
 /// Check to make sure that the portfolio is updated appropriately.
 #[test]
 fn market_simulation() {
-    let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap() - Duration::seconds(1);
+    let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+        - Duration::seconds(1);
 
     let mut portfolio = Portfolio::new(0.0, 300.0, time - Duration::seconds(1));
     assert_eq!(portfolio.get_assets(), 0.0);
@@ -23,17 +21,17 @@ fn market_simulation() {
 
     // this will be the sequences of prices used to simulate the market
     let mut prices = VecDeque::from_iter(&[
-        100.0,  // buy
-        99.0,   // buy
-        98.0,   // attempt sell
-        97.0,   // buy
-        98.0,   // sell
-        101.0,  // sell
+        100.0, // buy
+        99.0,  // buy
+        98.0,  // attempt sell
+        97.0,  // buy
+        98.0,  // sell
+        101.0, // sell
     ]);
 
     /*********************
-      handle the first buy
-      *********************/
+    handle the first buy
+    *********************/
 
     // simulate a buy order
     let price = prices.pop_front().unwrap();
@@ -42,7 +40,7 @@ fn market_simulation() {
         Side::Buy,
         *price,
         1.0,
-        time + Duration::milliseconds(1)
+        time + Duration::milliseconds(1),
     );
     portfolio.add_executed_trade(trade);
 
@@ -56,8 +54,8 @@ fn market_simulation() {
     assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 1);
 
     /**********************
-      handle the second buy
-      **********************/
+    handle the second buy
+    **********************/
 
     // simulate another buy order at a lower price than the first
     let price = prices.pop_front().unwrap();
@@ -66,7 +64,7 @@ fn market_simulation() {
         Side::Buy,
         *price,
         1.0,
-        time + Duration::milliseconds(2)
+        time + Duration::milliseconds(2),
     );
     portfolio.add_executed_trade(trade);
 
@@ -80,17 +78,13 @@ fn market_simulation() {
     assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 2);
 
     /*****************************
-      attempt an unprofitable sell
-      *****************************/
+    attempt an unprofitable sell
+    *****************************/
 
     // attempt to generate a sell order using `is_rate_profitable` at a rate which is not profitable
     let price = prices.pop_front().unwrap();
-    let potential_trade = FutureTrade::new(
-        Side::Sell,
-        *price,
-        1.0,
-        time + Duration::milliseconds(3)
-    );
+    let potential_trade =
+        FutureTrade::new(Side::Sell, *price, 1.0, time + Duration::milliseconds(3));
     let result = portfolio.is_rate_profitable(potential_trade.get_price());
 
     // assert that there is no proposed trade
@@ -106,8 +100,8 @@ fn market_simulation() {
     assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 2);
 
     /*********************
-      handle the third buy
-      *********************/
+    handle the third buy
+    *********************/
 
     // simulate another buy order at a lower price than the second
     let price = prices.pop_front().unwrap();
@@ -116,7 +110,7 @@ fn market_simulation() {
         Side::Buy,
         *price,
         1.0,
-        time + Duration::milliseconds(4)
+        time + Duration::milliseconds(4),
     );
     portfolio.add_executed_trade(trade);
 
@@ -130,8 +124,8 @@ fn market_simulation() {
     assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 3);
 
     /**************************
-      attempt a profitable sell
-      **************************/
+    attempt a profitable sell
+    **************************/
 
     // generate a sell order using `is_rate_profitable` at a rate which would sell the third buy order
     let price = prices.pop_front().unwrap();
@@ -141,10 +135,7 @@ fn market_simulation() {
     assert_eq!(potential_trade.get_price(), *price);
     assert_eq!(potential_trade.get_quantity(), 1.0);
 
-    let trade = ExecutedTrade::with_future_trade(
-        "id".to_string(),
-        potential_trade,
-    );
+    let trade = ExecutedTrade::with_future_trade("id".to_string(), potential_trade);
     portfolio.add_executed_trade(trade);
 
     // assert that capital and assets have changed accordingly
@@ -157,8 +148,8 @@ fn market_simulation() {
     assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 2);
 
     /****************************
-      sell the rest of the assets
-      ****************************/
+    sell the rest of the assets
+    ****************************/
 
     // simulate a sell order that will sell the first and second buy
     let price = prices.pop_front().unwrap();
@@ -168,10 +159,7 @@ fn market_simulation() {
     assert_eq!(potential_trade.get_price(), *price);
     assert_eq!(potential_trade.get_quantity(), 2.0);
 
-    let trade = ExecutedTrade::with_future_trade(
-        "id".to_string(),
-        potential_trade,
-    );
+    let trade = ExecutedTrade::with_future_trade("id".to_string(), potential_trade);
     portfolio.add_executed_trade(trade);
 
     // assert that capital and assets have changed accordingly

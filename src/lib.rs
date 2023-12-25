@@ -1,7 +1,7 @@
-pub mod portfolio;
-pub mod types;
-mod traits;
-pub mod markets;
-mod time;
 mod holder;
+pub mod markets;
+pub mod portfolio;
+mod time;
+mod traits;
+pub mod types;
 mod utils;

@@ -1,11 +1,11 @@
-use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
-use polars::prelude::{NamedFrom, Series};
+use crate::traits::AsDataFrame;
 use crate::types::reason_code::ReasonCode;
 use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
 use crate::types::trades::{calc_cost, Trade};
-use crate::traits::AsDataFrame;
+use chrono::NaiveDateTime;
+use polars::frame::DataFrame;
+use polars::prelude::{NamedFrom, Series};
 
 /// Represents a trade that has been rejected by the market or otherwise failed
 pub struct FailedTrade {
@@ -32,21 +32,18 @@ impl FailedTrade {
             price,
             quantity,
             cost,
-            point
+            point,
         }
     }
 
-    pub fn with_future_trade(
-        reason: ReasonCode,
-        trade: FutureTrade,
-    ) -> FailedTrade {
+    pub fn with_future_trade(reason: ReasonCode, trade: FutureTrade) -> FailedTrade {
         FailedTrade {
             reason,
             side: trade.get_side(),
             price: trade.get_price(),
             quantity: trade.get_quantity(),
             cost: trade.get_cost(),
-            point: trade.get_point().clone()
+            point: trade.get_point().clone(),
         }
     }
 }
@@ -60,7 +57,8 @@ impl AsDataFrame for FailedTrade {
             Series::new("cost", vec![self.cost]),
             Series::new("reason", vec![self.reason as i32]),
             Series::new("point", vec![self.point]),
-        ]).unwrap()
+        ])
+        .unwrap()
     }
 }
 
@@ -86,14 +84,13 @@ impl Trade for FailedTrade {
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use chrono::Utc;
     use super::*;
+    use crate::traits::AsDataFrame;
     use crate::types::signals::Side;
     use crate::types::trades::calc_cost;
-    use crate::traits::AsDataFrame;
+    use chrono::Utc;
 
     #[test]
     fn test_new() {
@@ -104,13 +101,7 @@ mod test {
         let cost = calc_cost(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let failed_trade = FailedTrade::new(
-            reason,
-            side,
-            price,
-            quantity,
-            point.clone(),
-        );
+        let failed_trade = FailedTrade::new(reason, side, price, quantity, point.clone());
 
         assert_eq!(failed_trade.reason, reason);
         assert_eq!(failed_trade.side, side);
@@ -130,17 +121,9 @@ mod test {
         let cost = calc_cost(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let future_trade = FutureTrade::new(
-            side,
-            price,
-            quantity,
-            point.clone(),
-        );
+        let future_trade = FutureTrade::new(side, price, quantity, point.clone());
 
-        let failed_trade = FailedTrade::with_future_trade(
-            reason,
-            future_trade,
-        );
+        let failed_trade = FailedTrade::with_future_trade(reason, future_trade);
 
         assert_eq!(failed_trade.reason, reason);
         assert_eq!(failed_trade.side, side);
@@ -171,12 +154,35 @@ mod test {
 
         let df = trade.as_dataframe();
         assert_eq!(df.shape(), (1, 6));
-        assert_eq!(df.get_column_names(), &["side", "price", "quantity", "cost", "reason", "point"]);
-        assert_eq!(df.column("side").unwrap().i32().unwrap().get(0).unwrap(), side as i32);
-        assert_eq!(df.column("price").unwrap().f64().unwrap().get(0).unwrap(), price);
-        assert_eq!(df.column("quantity").unwrap().f64().unwrap().get(0).unwrap(), quantity);
-        assert_eq!(df.column("cost").unwrap().f64().unwrap().get(0).unwrap(), cost);
-        assert_eq!(df.column("reason").unwrap().i32().unwrap().get(0).unwrap(), reason as i32);
+        assert_eq!(
+            df.get_column_names(),
+            &["side", "price", "quantity", "cost", "reason", "point"]
+        );
+        assert_eq!(
+            df.column("side").unwrap().i32().unwrap().get(0).unwrap(),
+            side as i32
+        );
+        assert_eq!(
+            df.column("price").unwrap().f64().unwrap().get(0).unwrap(),
+            price
+        );
+        assert_eq!(
+            df.column("quantity")
+                .unwrap()
+                .f64()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+            quantity
+        );
+        assert_eq!(
+            df.column("cost").unwrap().f64().unwrap().get(0).unwrap(),
+            cost
+        );
+        assert_eq!(
+            df.column("reason").unwrap().i32().unwrap().get(0).unwrap(),
+            reason as i32
+        );
         assert_eq!(
             df.column("point")
                 .unwrap()
@@ -184,6 +190,7 @@ mod test {
                 .unwrap()
                 .last()
                 .unwrap(),
-            point.timestamp_millis());
+            point.timestamp_millis()
+        );
     }
 }

@@ -3,7 +3,6 @@ mod bbands;
 use chrono::NaiveDateTime;
 use polars::prelude::{DataFrame, DataFrameJoinOps, JoinArgs, JoinType};
 
-
 /// Internal functions for indicators
 ///
 /// These functions are used to manage the stateful indicator object, and process the indicator
@@ -22,7 +21,11 @@ trait IndicatorUtilities {
     /// Convert the indicator output to a DataFrame
     ///
     /// This is used to convert the indicator output to a DataFrame with a single row.
-    fn convert_output_to_dataframe(&self, output: Self::Output, timestamp: NaiveDateTime) -> DataFrame;
+    fn convert_output_to_dataframe(
+        &self,
+        output: Self::Output,
+        timestamp: NaiveDateTime,
+    ) -> DataFrame;
 }
 
 /// This trait processes the candle data using the indicator function, then the output (the "graph")
@@ -62,7 +65,6 @@ pub trait IndicatorGraphHandler: IndicatorUtilities {
     fn get_indicator_history(&self) -> &Option<DataFrame>;
 }
 
-
 pub trait IndicatorSignalHandler: IndicatorGraphHandler {
     /// Process signal data for all candle data
     ///
@@ -92,9 +94,7 @@ pub trait IndicatorSignalHandler: IndicatorGraphHandler {
     /// # Returns
     /// A reference to the internal signal data dataframe
     fn get_signal_history(&self) -> &Option<DataFrame>;
-
 }
-
 
 /// Extract new rows from a time-series DataFrame
 ///
@@ -112,13 +112,15 @@ pub trait IndicatorSignalHandler: IndicatorGraphHandler {
 /// A DataFrame with the new rows from `updated`
 fn extract_new_rows(updated: &DataFrame, data: &DataFrame) -> DataFrame {
     // perform an anti-join to get the new rows
-    updated.join(data, ["time"], ["time"], JoinArgs::new(JoinType::Anti)).unwrap()
+    updated
+        .join(data, ["time"], ["time"], JoinArgs::new(JoinType::Anti))
+        .unwrap()
 }
 
 #[cfg(test)]
 mod tests {
-    use polars::prelude::*;
     use crate::indicators::extract_new_rows;
+    use polars::prelude::*;
 
     /// Test that extract_new_rows() returns the correct rows
     #[test]
@@ -130,7 +132,8 @@ mod tests {
             "low" => &[1, 2, 3, 44, 54],
             "close" => &[1, 2, 3, 45, 55],
             "volume" => &[1, 2, 3, 46, 56],
-        ).unwrap();
+        )
+        .unwrap();
 
         let indicator_data = df!(
             "time" => &[1, 2, 3],
@@ -139,30 +142,67 @@ mod tests {
             "low" => &[1, 2, 3],
             "close" => &[1, 2, 3],
             "volume" => &[1, 2, 3],
-        ).unwrap();
+        )
+        .unwrap();
 
         let new_rows = extract_new_rows(&candles, &indicator_data);
 
         assert_eq!(new_rows.shape(), (2, 6));
 
         // check time column
-        assert_eq!(new_rows.column("time").unwrap().i32().unwrap().get(0), Some(41));
-        assert_eq!(new_rows.column("time").unwrap().i32().unwrap().get(1), Some(51));
+        assert_eq!(
+            new_rows.column("time").unwrap().i32().unwrap().get(0),
+            Some(41)
+        );
+        assert_eq!(
+            new_rows.column("time").unwrap().i32().unwrap().get(1),
+            Some(51)
+        );
 
         // check open column
-        assert_eq!(new_rows.column("open").unwrap().i32().unwrap().get(0), Some(42));
-        assert_eq!(new_rows.column("open").unwrap().i32().unwrap().get(1), Some(52));
+        assert_eq!(
+            new_rows.column("open").unwrap().i32().unwrap().get(0),
+            Some(42)
+        );
+        assert_eq!(
+            new_rows.column("open").unwrap().i32().unwrap().get(1),
+            Some(52)
+        );
 
-        assert_eq!(new_rows.column("high").unwrap().i32().unwrap().get(0), Some(43));
-        assert_eq!(new_rows.column("high").unwrap().i32().unwrap().get(1), Some(53));
+        assert_eq!(
+            new_rows.column("high").unwrap().i32().unwrap().get(0),
+            Some(43)
+        );
+        assert_eq!(
+            new_rows.column("high").unwrap().i32().unwrap().get(1),
+            Some(53)
+        );
 
-        assert_eq!(new_rows.column("low").unwrap().i32().unwrap().get(0), Some(44));
-        assert_eq!(new_rows.column("low").unwrap().i32().unwrap().get(1), Some(54));
+        assert_eq!(
+            new_rows.column("low").unwrap().i32().unwrap().get(0),
+            Some(44)
+        );
+        assert_eq!(
+            new_rows.column("low").unwrap().i32().unwrap().get(1),
+            Some(54)
+        );
 
-        assert_eq!(new_rows.column("close").unwrap().i32().unwrap().get(0), Some(45));
-        assert_eq!(new_rows.column("close").unwrap().i32().unwrap().get(1), Some(55));
+        assert_eq!(
+            new_rows.column("close").unwrap().i32().unwrap().get(0),
+            Some(45)
+        );
+        assert_eq!(
+            new_rows.column("close").unwrap().i32().unwrap().get(1),
+            Some(55)
+        );
 
-        assert_eq!(new_rows.column("volume").unwrap().i32().unwrap().get(0), Some(46));
-        assert_eq!(new_rows.column("volume").unwrap().i32().unwrap().get(1), Some(56));
+        assert_eq!(
+            new_rows.column("volume").unwrap().i32().unwrap().get(0),
+            Some(46)
+        );
+        assert_eq!(
+            new_rows.column("volume").unwrap().i32().unwrap().get(1),
+            Some(56)
+        );
     }
 }

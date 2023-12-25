@@ -1,11 +1,9 @@
-mod types;
-mod traits;
 mod indicators;
-mod strategies;
-mod portfolio;
 mod markets;
+mod portfolio;
+mod strategies;
 mod time;
+mod traits;
+mod types;
 
-fn main() {
-
-}
+fn main() {}

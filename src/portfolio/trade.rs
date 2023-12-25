@@ -1,14 +1,11 @@
-use chrono::{NaiveDateTime, Utc};
-use polars::prelude::DataFrame;
 use crate::portfolio::assets::AssetHandlers;
 use crate::portfolio::capital::CapitalHandlers;
-use crate::portfolio::Portfolio;
 use crate::portfolio::position::PositionHandlers;
+use crate::portfolio::Portfolio;
 use crate::traits::AsDataFrame;
-use crate::types::{
-    Side,
-    ExecutedTrade, FailedTrade, FutureTrade, Trade
-};
+use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, Side, Trade};
+use chrono::{NaiveDateTime, Utc};
+use polars::prelude::DataFrame;
 
 /// Interface methods for storing trades
 pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
@@ -23,7 +20,7 @@ impl TradeHandlers for Portfolio {
     fn get_executed_trades(&self) -> &DataFrame {
         &self.executed_trades
     }
-    
+
     /// Add a failed trade to the portfolio
     ///
     /// Storing "failed trades" is only intended for debugging and backtesting purposes.
@@ -46,7 +43,7 @@ impl TradeHandlers for Portfolio {
             self.decrease_capital(trade.get_cost(), *trade.get_point());
             self.increase_assets(trade.get_quantity(), *trade.get_point());
             self.add_open_position(&trade);
-        } else{
+        } else {
             self.increase_capital(trade.get_cost(), *trade.get_point());
             self.decrease_assets(trade.get_quantity(), *trade.get_point());
             self.clear_open_positions(&trade)
@@ -73,46 +70,32 @@ impl TradeHandlers for Portfolio {
 
         if let Some(positions) = viable_positions {
             // the total quantity of assets to be sold
-            let quantity: f64 = positions
-                .column("quantity").unwrap()
-                .sum().unwrap();
+            let quantity: f64 = positions.column("quantity").unwrap().sum().unwrap();
             // the total cost at which the assets were purchased
-            let cost: f64 = positions
-                .column("cost").unwrap()
-                .sum().unwrap();
+            let cost: f64 = positions.column("cost").unwrap().sum().unwrap();
 
             // calculate the value of the assets at the proposed rate
             let sell_value = match self.fee_calculator {
                 Some(ref fee_calculator) => {
                     fee_calculator.cost_including_fee(quantity * rate, Side::Sell)
-                },
-                None => quantity * rate
+                }
+                None => quantity * rate,
             };
             let profit = sell_value - cost;
             if profit > self.threshold {
                 let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-                return Some(FutureTrade::new(
-                    Side::Sell,
-                    rate,
-                    quantity,
-                    time
-                ))
+                return Some(FutureTrade::new(Side::Sell, rate, quantity, time));
             }
         }
         None
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::portfolio::{AssetHandlers, CapitalHandlers, Portfolio, TradeHandlers};
+    use crate::types::{ExecutedTrade, FailedTrade, ReasonCode, Side, Trade};
     use chrono::{Duration, NaiveDateTime, Utc};
-    use crate::portfolio::{
-        Portfolio, AssetHandlers, CapitalHandlers, TradeHandlers
-    };
-    use crate::types::{
-        ReasonCode, Side, ExecutedTrade, FailedTrade, Trade
-    };
 
     /// Test that a failed trade is correctly added to the portfolio storage.
     /// Since the failed storage is only for debugging and backtestesting, no other checks
@@ -128,7 +111,7 @@ mod tests {
             Side::Buy,
             100.0,
             1.0,
-            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         portfolio.add_failed_trade(trade);
         assert_eq!(portfolio.failed_trades.height(), 1);
@@ -139,7 +122,7 @@ mod tests {
             Side::Sell,
             100.0,
             1.0,
-            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         portfolio.add_failed_trade(trade);
         assert_eq!(portfolio.failed_trades.height(), 2);
@@ -157,7 +140,7 @@ mod tests {
             Side::Buy,
             100.0,
             1.0,
-            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         assert!(portfolio.executed_trades.is_empty());
         assert_eq!(portfolio.get_capital(), 200.0);
@@ -177,7 +160,7 @@ mod tests {
             Side::Sell,
             100.0,
             1.0,
-            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
 
         portfolio.add_executed_trade(trade);
@@ -205,7 +188,7 @@ mod tests {
             Side::Buy,
             price,
             quantity,
-            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         portfolio.add_executed_trade(trade);
         assert_eq!(portfolio.open_positions.len(), 1);
@@ -222,7 +205,7 @@ mod tests {
             Side::Buy,
             100.1,
             quantity,
-            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         portfolio.add_executed_trade(trade2);
 
@@ -236,7 +219,7 @@ mod tests {
             Side::Buy,
             90.0,
             quantity,
-            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         portfolio.add_executed_trade(trade3);
 
@@ -254,13 +237,7 @@ mod tests {
         portfolio.set_threshold(1.0);
 
         // build a buy trade
-        let trade = ExecutedTrade::new_without_cost(
-            "id".to_string(),
-            Side::Buy,
-            100.0,
-            1.0,
-            time
-        );
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 100.0, 1.0, time);
 
         assert!(portfolio.is_rate_profitable(100.1).is_none());
     }

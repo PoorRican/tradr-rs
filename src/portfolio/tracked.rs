@@ -5,68 +5,71 @@ use polars::prelude::*;
 ///
 /// This low-level helper function used when appending rows to a TrackedValue.
 fn create_row<T>(value: f64, timestamp: T) -> DataFrame
-where T: Into<Option<NaiveDateTime>> {
-    let _timestamp = timestamp.into().unwrap_or_else(|| NaiveDateTime::from_timestamp_opt(
-        Utc::now().timestamp(),
-        0)
-        .unwrap());
+where
+    T: Into<Option<NaiveDateTime>>,
+{
+    let _timestamp = timestamp
+        .into()
+        .unwrap_or_else(|| NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
     df!(
         "timestamp" => [_timestamp],
         "value" => [value]
-    ).unwrap()
+    )
+    .unwrap()
 }
 
 /// This struct is used to track a value as it changes over time.
 ///
 /// It is specifically used to track the amount of assets and capital available to a portfolio
 /// at any given point in time. The value is tracked as a total which is incremented and decremented.
-/// 
+///
 /// It is a wrapper around a DataFrame with two columns: `timestamp` and `value`.
 #[derive(Clone, Debug)]
 pub struct TrackedValue(DataFrame);
 
 impl TrackedValue {
     /// Create a new TrackedValue with an initial value and a starting point in time
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `amount` - The initial value of the tracked value
     /// * `timestamp` - The starting point in time
     pub fn with_initial<T>(amount: f64, timestamp: T) -> TrackedValue
-    where T: Into<Option<NaiveDateTime>> {
+    where
+        T: Into<Option<NaiveDateTime>>,
+    {
         let row = create_row(amount, timestamp);
         TrackedValue(row)
     }
 
     /// Add a new value to the tracked value
-    /// 
+    ///
     /// This is a low-level interface and is not meant to be used directly.
-    /// 
+    ///
     /// # Arguments
     /// * `amount` - The amount to add to the tracked value
     /// * `timestamp` - The point in time at which the value was added
     fn add_value<T>(&mut self, amount: f64, timestamp: T)
-    where T: Into<Option<NaiveDateTime>> {
+    where
+        T: Into<Option<NaiveDateTime>>,
+    {
         let row = create_row(amount, timestamp);
         self.0 = self.0.vstack(&row).unwrap();
     }
 
     /// Get the most recent value
-    /// 
+    ///
     /// This is the main interface for retrieving the "value".
     pub fn get_last_value(&self) -> f64 {
         // find last row
-        let last_row = self.0
+        let last_row = self
+            .0
             .sort(["timestamp"], false, true)
             .unwrap()
             .tail(Some(1));
 
         // get value column
-        let val = last_row
-            .column("value")
-            .unwrap()
-            .get(0)
-            .unwrap();
+        let val = last_row.column("value").unwrap().get(0).unwrap();
 
         // extract value
         if let AnyValue::Float64(inner) = val {
@@ -77,23 +80,27 @@ impl TrackedValue {
     }
 
     /// Decrement the tracked value by the given amount
-    /// 
+    ///
     /// # Arguments
     /// * `amount` - The amount to decrement the total value by
     /// * `timestamp` - The point in time at which the total value was decremented
     pub fn decrement<T>(&mut self, amount: f64, timestamp: T)
-    where T: Into<Option<NaiveDateTime>> {
+    where
+        T: Into<Option<NaiveDateTime>>,
+    {
         let last_value = self.get_last_value();
         self.add_value(last_value - amount, timestamp);
     }
 
     /// Increment the tracked value by the given amount
-    /// 
+    ///
     /// # Arguments
     /// * `amount` - The amount to increment the total value by
     /// * `timestamp` - The point in time at which the total value was incremented
     pub fn increment<T>(&mut self, amount: f64, timestamp: T)
-    where T: Into<Option<NaiveDateTime>> {
+    where
+        T: Into<Option<NaiveDateTime>>,
+    {
         let last_value = self.get_last_value();
         self.add_value(last_value + amount, timestamp);
     }
@@ -110,7 +117,6 @@ impl Into<DataFrame> for TrackedValue {
         self.0
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -180,17 +186,77 @@ mod tests {
         let mut chart = TrackedValue(row);
 
         // assert that initial value is correct
-        assert_eq!(chart.0.column("value").unwrap().f64().unwrap().get(0).unwrap(), start_val);
-        assert_eq!(chart.0.column("timestamp").unwrap().datetime().unwrap().get(0).unwrap(), time.timestamp_millis());
+        assert_eq!(
+            chart
+                .0
+                .column("value")
+                .unwrap()
+                .f64()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+            start_val
+        );
+        assert_eq!(
+            chart
+                .0
+                .column("timestamp")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+            time.timestamp_millis()
+        );
 
         chart.add_value(added_val, added_time);
         // assert that initial value remains after insertion and that timestamp is intact
-        assert_eq!(chart.0.column("value").unwrap().f64().unwrap().get(0).unwrap(), start_val);
-        assert_eq!(chart.0.column("timestamp").unwrap().datetime().unwrap().get(0).unwrap(), time.timestamp_millis());
+        assert_eq!(
+            chart
+                .0
+                .column("value")
+                .unwrap()
+                .f64()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+            start_val
+        );
+        assert_eq!(
+            chart
+                .0
+                .column("timestamp")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+            time.timestamp_millis()
+        );
 
         // assert that correct value is inserted and that the correct timestamp is used
-        assert_eq!(chart.0.column("value").unwrap().f64().unwrap().get(1).unwrap(), added_val);
-        assert_eq!(chart.0.column("timestamp").unwrap().datetime().unwrap().get(1).unwrap(), added_time.timestamp_millis());
+        assert_eq!(
+            chart
+                .0
+                .column("value")
+                .unwrap()
+                .f64()
+                .unwrap()
+                .get(1)
+                .unwrap(),
+            added_val
+        );
+        assert_eq!(
+            chart
+                .0
+                .column("timestamp")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(1)
+                .unwrap(),
+            added_time.timestamp_millis()
+        );
     }
 
     #[test]
@@ -199,14 +265,35 @@ mod tests {
         let df = df!(
             "timestamp" => [1, 2, 3, 4, 5],
             "value" => [1.0, 2.0, 3.0, 4.0, 5.0]
-        ).unwrap();
+        )
+        .unwrap();
 
         let tracked = TrackedValue::from(df);
         assert_eq!(tracked.0.shape(), (5, 2));
 
         for i in 1..6 {
-            assert_eq!(tracked.0.column("timestamp").unwrap().i32().unwrap().get(i - 1).unwrap(), i as i32);
-            assert_eq!(tracked.0.column("value").unwrap().f64().unwrap().get(i - 1).unwrap(), i as f64);
+            assert_eq!(
+                tracked
+                    .0
+                    .column("timestamp")
+                    .unwrap()
+                    .i32()
+                    .unwrap()
+                    .get(i - 1)
+                    .unwrap(),
+                i as i32
+            );
+            assert_eq!(
+                tracked
+                    .0
+                    .column("value")
+                    .unwrap()
+                    .f64()
+                    .unwrap()
+                    .get(i - 1)
+                    .unwrap(),
+                i as f64
+            );
         }
     }
 
@@ -216,7 +303,8 @@ mod tests {
         let expected_df = df!(
             "timestamp" => [1, 2, 3, 4, 5],
             "value" => [1.0, 2.0, 3.0, 4.0, 5.0]
-        ).unwrap();
+        )
+        .unwrap();
 
         let tracked = TrackedValue::from(expected_df.clone());
 

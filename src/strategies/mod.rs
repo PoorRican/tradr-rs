@@ -1,7 +1,7 @@
-use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
 use crate::portfolio::Portfolio;
 use crate::types::FutureTrade;
+use chrono::NaiveDateTime;
+use polars::frame::DataFrame;
 
 pub trait Strategy {
     /// Returns a reference to the internally stored portfolio

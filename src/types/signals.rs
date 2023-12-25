@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 const BUY: isize = 1;
 const SELL: isize = -1;
@@ -65,7 +65,6 @@ impl From<i32> for Side {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -91,6 +90,9 @@ mod test {
     #[test]
     fn test_side_deserialize() {
         assert_eq!(serde_json::from_str::<Side>("\"buy\"").unwrap(), Side::Buy);
-        assert_eq!(serde_json::from_str::<Side>("\"sell\"").unwrap(), Side::Sell);
+        assert_eq!(
+            serde_json::from_str::<Side>("\"sell\"").unwrap(),
+            Side::Sell
+        );
     }
 }

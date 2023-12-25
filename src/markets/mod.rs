@@ -1,9 +1,9 @@
-mod fee;
 mod coinbase;
+mod fee;
 
 use async_trait::async_trait;
-pub use fee::{SimplePercentageFee, FeeCalculator};
 pub use coinbase::CoinbaseClient;
+pub use fee::{FeeCalculator, SimplePercentageFee};
 
 use crate::types::{Candle, ExecutedTrade, FutureTrade};
 
@@ -32,11 +32,12 @@ pub trait Market {
     /// # Arguments
     /// * `pair` - The trading pair to get candles for. This is market specific.
     /// * `interval` - The interval to get candles for. This is market specific.
-    async fn get_candles(&self,
-                   pair: &str,
-                   interval: &str,
-    ) -> Result<Vec<Candle>, reqwest::Error>;
+    async fn get_candles(&self, pair: &str, interval: &str) -> Result<Vec<Candle>, reqwest::Error>;
 
     /// Submits an order to the exchange and returns the executed trade.
-    async fn submit_order(&self, order: FutureTrade, product_id: String) -> Result<ExecutedTrade, reqwest::Error>;
+    async fn submit_order(
+        &self,
+        order: FutureTrade,
+        product_id: String,
+    ) -> Result<ExecutedTrade, reqwest::Error>;
 }
