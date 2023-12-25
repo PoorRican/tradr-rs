@@ -1,3 +1,24 @@
+/// This module contains traits for calculating indicator data from signals and determining
+/// signal data from that calculated data. Additionally, implementations of these traits
+/// are provided for specific indicators.
+///
+/// For each indicator implementation, there are two main traits that are implemented:
+/// 1. [`IndicatorGraphHandler`] - This trait is used to calculate the indicator data from the candle data.
+/// 2. [`IndicatorSignalHandler`] - This trait is used to calculate the signal data from the indicator data.
+///
+/// While these traits are inherently interlinked, they have been coded separately to allow for
+/// more flexibility in the future, and easier testing. The [`Indicator`] trait is a combination of
+/// the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended as the primary interface
+/// for processing candle data.
+///
+/// For all three traits, there are two main interfaces for processing candle data:
+/// 1. All candle data is processed at once, and the output is stored in a time-series DataFrame. This
+///     is intended for bootstrapping historical candle data and for backtesting.
+/// 2. A new candle row is processed, and the output is appended to the existing time-series DataFrame.
+///     This is intended for processing new candle data as it is received.
+///
+/// # Notes
+/// Due to the nature of candle data as it is received, there is no sorting that is performed internally.
 pub mod bbands;
 
 use chrono::NaiveDateTime;
@@ -35,7 +56,7 @@ trait IndicatorUtilities {
 /// There are main interfaces for processing the candle data:
 /// 1. All candle data is processed at once, and the entire output is stored in a time-series DataFrame
 /// 2. A new candle row is processed, and the output is appended to the time-series DataFrame
-pub trait IndicatorGraphHandler: IndicatorUtilities {
+trait IndicatorGraphHandler: IndicatorUtilities {
     /// Process indicator data for all candle data
     ///
     /// This is called to "bootstrap" the indicator data. It is called once at the beginning of the
@@ -49,7 +70,7 @@ pub trait IndicatorGraphHandler: IndicatorUtilities {
 
     /// Update processed indicator data with new candle data rows
     ///
-    /// Internally, `extract_new_rows()` is called to get the new candle data, then the new candle data is
+    /// Internally, [`extract_new_rows()`] is called to get the new candle data, then the new candle data is
     /// processed and appended to the time-series DataFrame
     ///
     /// # Arguments
@@ -66,7 +87,7 @@ pub trait IndicatorGraphHandler: IndicatorUtilities {
     fn get_indicator_history(&self) -> &Option<DataFrame>;
 }
 
-pub trait IndicatorSignalHandler: IndicatorGraphHandler {
+trait IndicatorSignalHandler: IndicatorGraphHandler {
     /// Process signal data for all candle data
     ///
     /// This is called to "bootstrap" the signal data, meant to be called once at the beginning of the
@@ -80,7 +101,7 @@ pub trait IndicatorSignalHandler: IndicatorGraphHandler {
 
     /// Update processed signal data with a new indicator graph row
     ///
-    /// Internally, `extract_new_rows()` is called to get the new indicator graph row, then the row is
+    /// Internally, [`extract_new_rows()`] is called to get the new indicator graph row, then the row is
     /// processed and appended to the time-series DataFrame
     ///
     /// # Arguments
@@ -97,6 +118,19 @@ pub trait IndicatorSignalHandler: IndicatorGraphHandler {
     fn get_signal_history(&self) -> &Option<DataFrame>;
 }
 
+/// This trait combines the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended
+/// as the primary interface exposed for processing candle data.
+///
+/// # Sequence of Operations
+///
+/// For normal runtime, the sequence of operations is as follows:
+/// 1. [`Indicator::process_existing()`] is called to process historical candle data at the beginning of the runtime.
+/// 2. [`Indicator::process_new()`] is called to process new candle data as it is received from the market.
+/// 3. [`Indicator::get_last_signal()`] is called to determine whether to attempt a trade.
+///
+/// For backtesting, the sequence of operations is as follows:
+/// 1. [`Indicator::process_existing()`] is called to process historical candle data.
+/// 2. [`Indicator::get_signals()`] is called to get all of the processed signal history.
 pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
 
     /// Process existing candle data
@@ -153,6 +187,11 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// Get signal history
     ///
     /// Exposes internal signal history for debugging or backtesting purposes.
+    ///
+    /// # Returns
+    /// * `Some` - The raw signal history. This is a time-series [`DataFrame`] with the columns "time" and "signal".
+    ///     Values for "signal" are not converted to the [`Signal`] enum.
+    /// * `None` - If there is no signal history
     fn get_signals(&self) -> &Option<DataFrame> {
         self.get_signal_history()
     }
@@ -164,7 +203,10 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
 /// with the rows that are in the `updated` DataFrame but not in the `data` DataFrame.
 ///
 /// This function is used when extracting new candle data that has not been processed by the indicator,
-/// and indicator data that has not been processed for signals.
+/// and indicator data that has not been processed for signals. For example, if `updated` has two rows
+/// (with times "1" and "2") and `data` has one row (with time "1"), then the result will be a DataFrame with
+/// one row (corresponding to time "2"). Comparison is exclusively done on the "time" column and the content
+/// of the other columns is ignored.
 ///
 /// # Arguments
 /// * `updated` - The DataFrame with the new rows
