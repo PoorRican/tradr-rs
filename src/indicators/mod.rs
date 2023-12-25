@@ -53,13 +53,46 @@ pub trait IndicatorGraphHandler: IndicatorUtilities {
     ///
     /// # Panics
     /// * If the DataFrame does not contain exactly one new row
-    fn process_new_row(&mut self, candles: &DataFrame);
+    fn process_new_candles(&mut self, candles: &DataFrame);
 
     /// Get the entirety of the calculated indicator data
     ///
     /// # Returns
     /// A reference to the internal indicator graph
     fn get_indicator_history(&self) -> &Option<DataFrame>;
+}
+
+
+pub trait IndicatorSignalHandler: IndicatorGraphHandler {
+    /// Process signal data for all candle data
+    ///
+    /// This is called to "bootstrap" the signal data, meant to be called once at the beginning of the
+    /// runtime.
+    ///
+    /// Any old signal data is cleared.
+    ///
+    /// # Arguments
+    /// * `candles` - The DataFrame with candle data. This is used to determine the signal.
+    fn process_existing_data(&mut self, candles: &DataFrame);
+
+    /// Update processed signal data with a new indicator graph row
+    ///
+    /// Internally, `extract_new_rows()` is called to get the new indicator graph row, then the row is
+    /// processed and appended to the time-series DataFrame
+    ///
+    /// # Arguments
+    /// * `candles` - The DataFrame with the candle data and is used to determine the signal.
+    ///
+    /// # Panics
+    /// * If the DataFrame does not contain exactly one new row
+    fn process_new_data(&mut self, candles: &DataFrame);
+
+    /// Get the entirety of the calculated signal data
+    ///
+    /// # Returns
+    /// A reference to the internal signal data dataframe
+    fn get_signal_history(&self) -> &Option<DataFrame>;
+
 }
 
 
