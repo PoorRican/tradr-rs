@@ -31,31 +31,10 @@ impl BBands {
     }
 }
 impl IndicatorUtilities for BBands {
-    type Output = BollingerBandsOutput;
-
     fn restart_indicator(&mut self) {
         self.indicator = BollingerBands::new(self.period, self.multiplier).unwrap();
     }
 
-    fn convert_output_to_dataframe(
-        &self,
-        output: Self::Output,
-        timestamp: NaiveDateTime,
-    ) -> DataFrame {
-        let lower = output.lower;
-        let middle = output.average;
-        let upper = output.upper;
-
-        let df = df!(
-            "time" => &[timestamp],
-            "lower" => &[lower],
-            "middle" => &[middle],
-            "upper" => &[upper],
-        )
-        .unwrap();
-
-        df
-    }
 }
 
 impl Default for BBands {
@@ -235,6 +214,36 @@ impl IndicatorSignalHandler for BBands {
 }
 
 impl Indicator for BBands {}
+
+/// Convert indicator output to a DataFrame
+///
+/// This is used to convert the indicator output to a DataFrame with a single row
+/// used to build the history DataFrame.
+///
+/// # Arguments
+/// * `output` - The indicator output (`ta` specific)
+/// * `timestamp` - The timestamp of the candle
+///
+/// # Returns
+/// A DataFrame with a single row to use as a history row
+fn convert_output_to_dataframe(
+    output: BollingerBandsOutput,
+    timestamp: NaiveDateTime,
+) -> DataFrame {
+    let lower = output.lower;
+    let middle = output.average;
+    let upper = output.upper;
+
+    let df = df!(
+            "time" => &[timestamp],
+            "lower" => &[lower],
+            "middle" => &[middle],
+            "upper" => &[upper],
+        )
+        .unwrap();
+
+    df
+}
 
 /// Unwrap a row from the indicator graph into a `BollingerBandsOutput`
 ///

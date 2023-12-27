@@ -32,22 +32,11 @@ use crate::types::Signal;
 ///
 /// This interface should not be exposed to higher-level code.
 trait IndicatorUtilities {
-    type Output;
-
     /// Reset the indicator
     ///
     /// This is used to reset the indicator to its initial state since indicator functions used by
     /// the TA library are stateful.
     fn restart_indicator(&mut self);
-
-    /// Convert the indicator output to a DataFrame
-    ///
-    /// This is used to convert the indicator output to a DataFrame with a single row.
-    fn convert_output_to_dataframe(
-        &self,
-        output: Self::Output,
-        timestamp: NaiveDateTime,
-    ) -> DataFrame;
 }
 
 /// This trait processes the candle data using the indicator function, then the output (the "graph")
