@@ -1,18 +1,60 @@
-use crate::portfolio::Portfolio;
-use crate::types::FutureTrade;
-use chrono::NaiveDateTime;
+mod consensus;
+
 use polars::frame::DataFrame;
+use crate::types::Signal;
+use crate::indicators::Indicator;
+pub use crate::strategies::consensus::Consensus;
 
-pub trait Strategy {
-    /// Returns a reference to the internally stored portfolio
-    fn get_portfolio(&self) -> &Portfolio;
 
-    /// Builder function to add a reference to a portfolio
-    fn add_portfolio(self, portfolio: &Portfolio) -> Self;
+/// A [`IndicatorContainer`] is a collection of [`Indicator`] objects.
+type IndicatorContainer = Vec<Box<dyn Indicator>>;
 
-    /// Builder function to add a reference to candles
-    fn add_candles(self, candles: &DataFrame) -> Self;
+/// A [`Strategy`] is a facade for interfacing with more than one [`Indicator`] objects.
+///
+/// A simple interface is provided for bootstrapping historical candle data, processing new candle data,
+/// and generating a consensus [`Signal`] among all [`Indicator`] objects.
+pub struct Strategy {
+    indicators: IndicatorContainer,
+    consensus: Consensus,
+}
+impl Strategy {
+    pub fn new(
+        indicators: IndicatorContainer,
+        consensus: Consensus
+    ) -> Self {
+        Self {
+            indicators,
+            consensus,
+        }
+    }
 
-    /// Generate a trade to attempt to execute on the market
-    fn process(&mut self, point: Option<NaiveDateTime>) -> Option<FutureTrade>;
+    /// Bootstrap historical candle data
+    pub fn bootstrap(&mut self, data: DataFrame) {
+        for indicator in self.indicators.iter_mut() {
+            indicator.bootstrap(data.clone());
+        }
+    }
+
+    /// Process a new candle and generate a consensus [`Signal`] among the [`Indicator`] objects.
+    ///
+    /// Internally, the dataframe is propagated to all internal indicators, and the resulting
+    /// signals are gathered. A consensus is then reached between the signals, and returned.
+    ///
+    /// # Arguments
+    /// * `row` - The new candle data to process
+    ///
+    /// # Returns
+    /// A [`Signal`] representing the consensus between all [`Indicator`] objects
+    pub fn process(&mut self, row: DataFrame) -> Signal {
+        for indicator in self.indicators.iter_mut() {
+            indicator.process_new(&row);
+        }
+
+        let signals = self.indicators
+            .iter()
+            .map(|x| x.get_signal())
+            .collect::<Vec<Signal>>();
+
+        self.consensus.reduce(signals.into_iter())
+    }
 }
