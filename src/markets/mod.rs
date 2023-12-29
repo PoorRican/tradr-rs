@@ -1,6 +1,6 @@
 mod coinbase;
 mod fee;
-mod holder;
+pub mod manager;
 
 use async_trait::async_trait;
 
