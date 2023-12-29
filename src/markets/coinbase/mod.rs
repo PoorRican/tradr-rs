@@ -6,6 +6,7 @@ use crate::types::{Candle, ExecutedTrade, FutureTrade};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use tradr::markets::BaseMarket;
 
 const BASE_URL: &str = "https://api.exchange.coinbase.com";
 
@@ -66,28 +67,7 @@ impl CoinbaseClient {
     }
 }
 
-#[async_trait]
-impl Market for CoinbaseClient {
-    type PairType = TradingPairInfo;
-    type FeeCalculator = SimplePercentageFee;
-
-    async fn get_fee_calculator(&self) -> Option<&dyn FeeCalculator> {
-        todo!()
-    }
-
-    async fn get_trading_pair_info(&self) -> Result<Vec<Self::PairType>, reqwest::Error> {
-        let url = format!("{}/products/", BASE_URL);
-
-        let response = self
-            .client
-            .get(&url)
-            .send()
-            .await?
-            .json::<Vec<Self::PairType>>()
-            .await?;
-        Ok(response)
-    }
-
+impl BaseMarket for CoinbaseClient {
     async fn get_candles(&self, pair: &str, interval: &str) -> Result<Vec<Candle>, reqwest::Error> {
         assert!(VALID_INTERVALS.iter().any(|x| x[0] == interval));
 
@@ -107,6 +87,7 @@ impl Market for CoinbaseClient {
             .await?;
         Ok(response)
     }
+
 
     /// Submits an order to the exchange and returns the executed trade.
     ///
@@ -149,6 +130,30 @@ impl Market for CoinbaseClient {
 
         Ok(response.into())
     }
+}
+
+#[async_trait]
+impl Market for CoinbaseClient {
+    type PairType = TradingPairInfo;
+    type FeeCalculator = SimplePercentageFee;
+
+    async fn get_fee_calculator(&self) -> Option<&dyn FeeCalculator> {
+        todo!()
+    }
+
+    async fn get_trading_pair_info(&self) -> Result<Vec<Self::PairType>, reqwest::Error> {
+        let url = format!("{}/products/", BASE_URL);
+
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await?
+            .json::<Vec<Self::PairType>>()
+            .await?;
+        Ok(response)
+    }
+
 }
 
 #[cfg(test)]
