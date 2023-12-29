@@ -70,6 +70,25 @@ impl ExecutedTrade {
     pub fn get_id(&self) -> &String {
         &self.id
     }
+
+    pub fn from_row(row: &DataFrame) -> Self {
+        assert_eq!(row.height(), 1);
+        assert_eq!(row.get_column_names(), &["id", "side", "price", "quantity", "cost", "point"]);
+        let id = row.column("id").unwrap().utf8().unwrap().get(0).unwrap();
+        let side = Side::from(row.column("side").unwrap().i32().unwrap().get(0).unwrap());
+        let price = row.column("price").unwrap().f64().unwrap().get(0).unwrap();
+        let quantity = row.column("quantity").unwrap().f64().unwrap().get(0).unwrap();
+        let cost = row.column("cost").unwrap().f64().unwrap().get(0).unwrap();
+        let point = NaiveDateTime::from_timestamp_millis(
+            row.column("point")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0)
+                .unwrap(),
+        ).unwrap();
+        ExecutedTrade::new(id.to_string(), side, price, quantity, cost, point)
+    }
 }
 
 impl AsDataFrame for ExecutedTrade {
@@ -231,5 +250,29 @@ mod test {
                 .unwrap(),
             point.timestamp_millis()
         );
+    }
+
+    #[test]
+    fn test_from_row() {
+        use polars::prelude::*;
+
+        let time = Utc::now().naive_utc();
+
+        let row = df![
+            "id" => ["id"],
+            "side" => [Side::Buy as i32],
+            "price" => [1.0],
+            "quantity" => [2.0],
+            "cost" => [3.0],
+            "point" => [time]
+        ].unwrap();
+        let trade = ExecutedTrade::from_row(&row);
+
+        assert_eq!(trade.id, "id");
+        assert_eq!(trade.side, Side::Buy);
+        assert_eq!(trade.price, 1.0);
+        assert_eq!(trade.quantity, 2.0);
+        assert_eq!(trade.cost, 3.0);
+        assert_eq!(trade.point.timestamp_millis(), time.timestamp_millis());
     }
 }
