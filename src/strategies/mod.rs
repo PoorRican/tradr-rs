@@ -31,7 +31,7 @@ impl Strategy {
     /// Bootstrap historical candle data
     pub fn bootstrap(&mut self, data: DataFrame) {
         for indicator in self.indicators.iter_mut() {
-            indicator.bootstrap(data.clone());
+            indicator.process_existing(&data);
         }
     }
 
@@ -52,7 +52,7 @@ impl Strategy {
 
         let signals = self.indicators
             .iter()
-            .map(|x| x.get_signal())
+            .map(|x| x.get_last_signal().expect("No signal found"))
             .collect::<Vec<Signal>>();
 
         self.consensus.reduce(signals.into_iter())

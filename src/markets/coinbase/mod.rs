@@ -6,7 +6,7 @@ use crate::types::{Candle, ExecutedTrade, FutureTrade};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tradr::markets::BaseMarket;
+use crate::markets::BaseMarket;
 
 const BASE_URL: &str = "https://api.exchange.coinbase.com";
 
@@ -67,6 +67,7 @@ impl CoinbaseClient {
     }
 }
 
+#[async_trait]
 impl BaseMarket for CoinbaseClient {
     async fn get_candles(&self, pair: &str, interval: &str) -> Result<Vec<Candle>, reqwest::Error> {
         assert!(VALID_INTERVALS.iter().any(|x| x[0] == interval));

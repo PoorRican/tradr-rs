@@ -56,7 +56,7 @@ impl IndicatorGraphHandler for BBands {
             .map(|(value, timestamp)| {
                 let output = self.indicator.next(value.unwrap());
                 let timestamp = NaiveDateTime::from_timestamp_millis(timestamp.unwrap()).unwrap();
-                self.convert_output_to_dataframe(output, timestamp)
+                convert_output_to_dataframe(output, timestamp)
             })
             .collect::<Vec<DataFrame>>();
 
@@ -105,7 +105,7 @@ impl IndicatorGraphHandler for BBands {
         let output = self.indicator.next(data_point);
 
         // convert the output to a DataFrame
-        let df = self.convert_output_to_dataframe(output, timestamp);
+        let df = convert_output_to_dataframe(output, timestamp);
 
         // update the history
         if let Some(ref mut history) = self.history {
