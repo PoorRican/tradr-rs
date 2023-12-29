@@ -1,9 +1,10 @@
-use crate::indicators::{extract_new_rows, Indicator, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities};
+use crate::indicators::{Indicator, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities};
 use crate::types::Signal;
 use chrono::NaiveDateTime;
 use polars::prelude::*;
 use ta::indicators::{BollingerBands, BollingerBandsOutput};
 use ta::Next;
+use crate::utils::extract_new_rows;
 
 const DEFAULT_PERIOD: usize = 20;
 const DEFAULT_MULTIPLIER: f64 = 2.0;
