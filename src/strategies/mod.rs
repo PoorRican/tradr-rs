@@ -45,9 +45,12 @@ impl Strategy {
     ///
     /// # Returns
     /// A [`Signal`] representing the consensus between all [`Indicator`] objects
-    pub fn process(&mut self, row: DataFrame) -> Signal {
+    ///
+    /// # Panics
+    /// * If the DataFrame does not contain exactly one new row
+    pub fn process(&mut self, row: &DataFrame) -> Signal {
         for indicator in self.indicators.iter_mut() {
-            indicator.process_new(&row);
+            indicator.process_new(row);
         }
 
         let signals = self.indicators
