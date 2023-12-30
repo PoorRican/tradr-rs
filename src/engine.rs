@@ -1,8 +1,10 @@
+use std::io::Error;
+use std::path::Path;
 use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use crate::markets::{BaseMarket};
 use crate::markets::manager::CandleManager;
-use crate::portfolio::{Portfolio, TradeHandlers};
+use crate::portfolio::{Portfolio, TradeHandlers, Persistence};
 use crate::strategies::Strategy;
 use crate::types::{FutureTrade, Side};
 
@@ -99,6 +101,12 @@ where T: BaseMarket {
                 .unwrap();
             self.portfolio.add_executed_trade(executed);
         }
+    }
+
+    pub fn save(&mut self, path: &Path) -> Result<(), Error> {
+        self.manager.save(path)?;
+        self.portfolio.save(path)?;
+        Ok(())
     }
 }
 

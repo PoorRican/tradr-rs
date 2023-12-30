@@ -8,6 +8,7 @@ mod trade;
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
 pub use position::PositionHandlers;
+pub use persistence::Persistence;
 pub use trade::TradeHandlers;
 
 use crate::markets::FeeCalculator;
