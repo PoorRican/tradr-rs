@@ -40,6 +40,7 @@ pub struct TradingPairInfo {
     pub status_message: Option<String>,
 }
 
+#[derive(Clone)]
 pub struct CoinbaseClient {
     api_key: String,
     api_secret: String,

@@ -8,9 +8,10 @@ use polars_io::csv::{CsvReader, CsvWriter};
 use polars_io::{SerReader, SerWriter};
 use crate::markets::BaseMarket;
 use crate::traits::AsDataFrame;
+use crate::utils::extract_new_rows;
 
 
-const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
+pub const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
 
 
 /// Updates the existing data frame with the new data frame.
@@ -68,14 +69,16 @@ fn load_candles(file_path: &Path) -> Result<DataFrame, Error> {
 }
 
 
-struct CandleManager {
+pub struct CandleManager<T>
+where T: BaseMarket {
     candles: HashMap<String, DataFrame>,
     pair: String,
-    market: Box<dyn BaseMarket>,
+    market: T,
 }
 
-impl CandleManager {
-    pub fn new(pair: &str, market: Box<dyn BaseMarket>) -> Self {
+impl<T> CandleManager<T>
+where T: BaseMarket {
+    pub fn new(pair: &str, market: T) -> Self {
         Self {
             candles: HashMap::new(),
             pair: pair.to_string(),
@@ -87,7 +90,7 @@ impl CandleManager {
         self.candles.get(&interval.to_string())
     }
 
-    pub async fn update(&mut self, interval: &str) {
+    pub async fn update(&mut self, interval: &str) -> Option<DataFrame> {
         let candles = self.market.get_candles(&self.pair, interval)
             .await
             .unwrap();
@@ -95,10 +98,13 @@ impl CandleManager {
         match self.candles.get(interval) {
             Some(existing) => {
                 let updated = append_candles(existing, df).unwrap();
+                let new_row = extract_new_rows(&updated, existing);
                 self.candles.insert(interval.to_string(), updated);
+                Some(new_row)
             }
             None => {
                 self.candles.insert(interval.to_string(), df);
+                None
             }
         }
     }
@@ -152,8 +158,8 @@ mod tests {
             .unwrap()
     }
 
-    fn create_manager() -> CandleManager {
-        let market = Box::new(CoinbaseClient::new());
+    fn create_manager() -> CandleManager<CoinbaseClient> {
+        let market = CoinbaseClient::new();
         let mut manager = CandleManager::new("BTC-USD", market);
 
         for interval in VALID_INTERVALS {
