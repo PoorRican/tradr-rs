@@ -14,9 +14,11 @@ use crate::utils::extract_new_rows;
 pub const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
 
 
-/// Updates the existing data frame with the new data frame.
+/// Updates the existing data frame by appending the new data frame.
 ///
 /// Any rows that have the same time value will be overwritten.
+///
+/// The array is sorted by time in descending order.
 ///
 /// # Arguments
 /// * `existing` - Reference to the existing data frame.
@@ -27,7 +29,9 @@ pub const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
 fn append_candles(existing: &DataFrame, new_candles: DataFrame) -> PolarsResult<DataFrame> {
     let mut appended = existing.vstack(&new_candles)?;
 
-    appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)
+    let mut unique = appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)?;
+
+    unique.sort(["time"], true, false)
 }
 
 
@@ -43,6 +47,7 @@ fn save_candles(file_path: &Path, data: &mut DataFrame) -> Result<(), Error> {
         .write(true)
         .create(true)
         .open(file_path)?;
+
     CsvWriter::new(file)
         .include_header(true)
         .finish(data)
@@ -149,7 +154,7 @@ mod tests {
 
     fn create_df() -> DataFrame {
         df!(
-            "time" => &[1, 2, 3, 4],
+            "time" => &[6, 5, 4, 3],
             "open" => &[1.0, 2.0, 3.0, 4.0],
             "high" => &[1.0, 2.0, 3.0, 4.0],
             "low" => &[1.0, 2.0, 3.0, 4.0],
@@ -180,7 +185,7 @@ mod tests {
 
         // create a new data frame with 2 rows
         let new_df = polars::prelude::df!(
-            "time" => &[4, 5],
+            "time" => &[3, 2],
             "open" => &[5.0, 6.0],
             "high" => &[5.0, 6.0],
             "low" => &[5.0, 6.0],
@@ -275,7 +280,7 @@ mod tests {
 
         // create a new data frame with 2 rows
         let new_df = df![
-            "time" => &[4, 5],
+            "time" => &[3, 2],
             "open" => &[5.0, 6.0],
             "high" => &[5.0, 6.0],
             "low" => &[5.0, 6.0],
