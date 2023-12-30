@@ -131,6 +131,17 @@ where T: BaseMarket {
         self.portfolio.save(path)?;
         Ok(())
     }
+
+    pub fn last_candle_time(&self) -> NaiveDateTime {
+        let df = self.manager.get(&self.current_interval).unwrap();
+        let time = df.column("time")
+            .unwrap()
+            .datetime()
+            .unwrap()
+            .head(Some(1))
+            .get(0).unwrap();
+        NaiveDateTime::from_timestamp_millis(time).unwrap()
+    }
 }
 
 /// Use the current candle row to generate a rate for buying assets

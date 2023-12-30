@@ -43,6 +43,10 @@ async fn main() {
     println!("Completed bootstrapping and saved data...");
     print_time();
 
+    // print last candle time
+    let last_candle_time = engine.last_candle_time();
+    println!("The last candle retrieved is {last_candle_time}");
+
     // wait until the next candle is released
     println!("Waiting until next interval...");
     wait_until(INTERVAL).await;
