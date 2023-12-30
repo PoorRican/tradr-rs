@@ -1,6 +1,6 @@
 use std::io::Error;
 use std::path::Path;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use polars::frame::DataFrame;
 use crate::markets::{BaseMarket};
 use crate::markets::manager::CandleManager;
@@ -52,6 +52,14 @@ where T: BaseMarket {
         // TODO: load candles
         self.manager.update_all().await;
         self.strategy.bootstrap(self.manager.get(&self.current_interval).unwrap().clone());
+
+        // print last candle time
+        let last_candle_time = self.last_candle_time();
+        println!("The last candle retrieved is {last_candle_time}");
+
+        // print feedback
+        let time = Utc::now().naive_utc();
+        println!("Bootstrapping was completed at {time}");
     }
 
     /// Run the engine for a single iteration
@@ -69,7 +77,6 @@ where T: BaseMarket {
             .await
             .unwrap();
         if new_row.height() == 0 {
-            eprintln!("No new data available");
             return false;
         } else if new_row.height() > 1 {
             panic!("Too many new rows");
@@ -78,6 +85,17 @@ where T: BaseMarket {
         // pass row to strategy
         let signal = self.strategy.process(&new_row);
 
+        // output time of last candle
+        let time = NaiveDateTime::from_timestamp_millis(
+            new_row.column("time")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0)
+                .unwrap()).unwrap();
+        println!("Processed candle for {time}");
+
+        // drop all hold values
         let side = match Side::try_from(signal) {
             Ok(side) => side,
             Err(_) => return true,
@@ -129,6 +147,8 @@ where T: BaseMarket {
     pub fn save(&mut self, path: &Path) -> Result<(), Error> {
         self.manager.save(path)?;
         self.portfolio.save(path)?;
+
+        println!("Saved data");
         Ok(())
     }
 

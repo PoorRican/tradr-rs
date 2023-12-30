@@ -17,6 +17,8 @@ mod timing;
 
 #[tokio::main]
 async fn main() {
+    println!("Starting...\n");
+
     const INTERVAL: &str = "5m";
 
     let market = markets::CoinbaseClient::new()
@@ -29,7 +31,7 @@ async fn main() {
         INTERVAL,
         portfolio,
         strategy,
-        "BTC-USD",
+        "MATIC-USD",
         &market);
 
 
@@ -40,12 +42,6 @@ async fn main() {
     engine.bootstrap().await;
     engine.save(path)
         .expect("Failed to save data");
-    println!("Completed bootstrapping and saved data...");
-    print_time();
-
-    // print last candle time
-    let last_candle_time = engine.last_candle_time();
-    println!("The last candle retrieved is {last_candle_time}");
 
     // wait until the next candle is released
     println!("Waiting until next interval...");
@@ -56,17 +52,17 @@ async fn main() {
     print_time();
 
     loop {
-        // if there is no new data, wait 5 seconds and try again
+        print!("\n");
+        // if there is no new data, wait then try again
         // certain intervals might not have data available and can be significantly delayed.
         // therefore, in order to catch as much data as possible, a wait time is necessary
         // in order to prevent the next update from returning more than one row
         while !engine.run().await {
             let wait = 20;
-            eprintln!("No new data available. Retrying in {wait} seconds");
             sleep(Duration::from_secs(wait)).await;
         }
-        print_time();
         println!("Ran 1 iteration");
+        print_time();
         engine.save(path).unwrap();
         wait_until(INTERVAL).await;
     }
