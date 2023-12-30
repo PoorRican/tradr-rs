@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -29,6 +30,16 @@ impl From<i32> for Signal {
             0 => Signal::Hold,
             BUY => Signal::Buy,
             _ => panic!("Invalid signal value: {}", value),
+        }
+    }
+}
+
+impl Display for Signal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Signal::Buy => write!(f, "Buy"),
+            Signal::Hold => write!(f, "Hold"),
+            Signal::Sell => write!(f, "Sell"),
         }
     }
 }
