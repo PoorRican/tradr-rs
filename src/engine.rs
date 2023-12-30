@@ -58,17 +58,21 @@ where T: BaseMarket {
     ///
     /// This will update the candle manager, pass the new row to the strategy, and then
     /// submit a trade to the market if the strategy returns a signal.
-    pub async fn run(&mut self) {
+    ///
+    /// # Returns
+    /// `bool` - Whether or not a retry should be attempted:
+    /// * `true` if the engine correctly processed new candle data
+    /// * `false` if there was no new candle data available. This triggers a retry.
+    pub async fn run(&mut self) -> bool {
         let new_row = self.manager
             .update(&self.current_interval)
             .await
             .unwrap();
         if new_row.height() == 0 {
             eprintln!("No new data available");
-            return;
+            return false;
         } else if new_row.height() > 1 {
-            eprintln!("Multiple new rows available...");
-            return;
+            panic!("Too many new rows");
         }
 
         // pass row to strategy
@@ -76,7 +80,7 @@ where T: BaseMarket {
 
         let side = match Side::try_from(signal) {
             Ok(side) => side,
-            Err(_) => return,
+            Err(_) => return true,
         };
 
         // generate rate
@@ -118,7 +122,8 @@ where T: BaseMarket {
                 .await
                 .unwrap();
             self.portfolio.add_executed_trade(executed);
-        }
+        };
+        true
     }
 
     pub fn save(&mut self, path: &Path) -> Result<(), Error> {

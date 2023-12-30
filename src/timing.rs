@@ -1,15 +1,13 @@
+/// Synchronize runtime execution with candle intervals
 use chrono::{Duration, NaiveDateTime, Timelike, Utc};
 use tokio::time::sleep;
 use std::time::Duration as StdDuration;
 
-/// Synchronize runtime execution with candle intervals
 
 pub async fn wait_until(interval: &str) {
     // determine time until next interval
     let now = Utc::now()
-        .naive_utc()
-        .with_second(0).unwrap()
-        .with_nanosecond(0).unwrap();
+        .naive_utc();
     let next = get_wait_time(now, interval);
 
     let duration = StdDuration::new(next.num_seconds() as u64, next.num_nanoseconds().unwrap() as u32);

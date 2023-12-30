@@ -1,5 +1,7 @@
 use std::path::Path;
+use std::time::Duration;
 use tokio::time::sleep;
+use crate::timing::wait_until;
 
 mod indicators;
 mod markets;
@@ -15,6 +17,8 @@ mod timing;
 
 #[tokio::main]
 async fn main() {
+    const INTERVAL: &str = "5m";
+
     let market = markets::CoinbaseClient::new()
         .disable_trades();
     let portfolio = portfolio::Portfolio::new(0.0, 100.0, None);
@@ -22,10 +26,10 @@ async fn main() {
         Box::new(indicators::BBands::new(20, 2.0)),
     ], strategies::Consensus::Unison);
     let mut engine = engine::Engine::new(
-        "5m",
-       portfolio,
+        INTERVAL,
+        portfolio,
         strategy,
-        "DOGE-USD",
+        "BTC-USD",
         &market);
 
 
@@ -34,21 +38,37 @@ async fn main() {
 
     // bootstrap
     engine.bootstrap().await;
-    println!("Completed bootstrapping...");
-
-    // save current data
-    // TODO: attempt to load data
     engine.save(path)
         .expect("Failed to save data");
-    println!("Saved data...");
+    println!("Completed bootstrapping and saved data...");
+    print_time();
 
+    // wait until the next candle is released
+    println!("Waiting until next interval...");
+    wait_until(INTERVAL).await;
 
-    // run the engine once every 5 minutes
-    // TODO: sync with candles. ie: when time is a multiple of 5 minutes
+    // run the engine once per interval
+    println!("\nBeginning loop...");
+    print_time();
+
     loop {
-        engine.run().await;
-        engine.save(path).unwrap();
-        sleep(core::time::Duration::from_secs(60*5)).await;
+        // if there is no new data, wait 5 seconds and try again
+        // certain intervals might not have data available and can be significantly delayed.
+        // therefore, in order to catch as much data as possible, a wait time is necessary
+        // in order to prevent the next update from returning more than one row
+        while !engine.run().await {
+            let wait = 20;
+            eprintln!("No new data available. Retrying in {wait} seconds");
+            sleep(Duration::from_secs(wait)).await;
+        }
+        print_time();
         println!("Ran 1 iteration");
+        engine.save(path).unwrap();
+        wait_until(INTERVAL).await;
     }
+}
+
+fn print_time() {
+    let time = chrono::Utc::now();
+    println!("The time is now {time}");
 }
