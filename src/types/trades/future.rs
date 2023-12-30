@@ -28,6 +28,17 @@ impl FutureTrade {
             point,
         }
     }
+
+    pub fn new_from_cost(side: Side, price: f64, cost: f64, point: NaiveDateTime) -> FutureTrade {
+        let quantity = cost / price;
+        FutureTrade {
+            side,
+            price,
+            quantity,
+            cost,
+            point,
+        }
+    }
 }
 
 impl AsDataFrame for FutureTrade {

@@ -93,7 +93,7 @@ where T: BaseMarket {
         let trade = match side {
             Side::Buy => {
                 if self.portfolio.able_to_buy() {
-                    let amount = self.portfolio.get_buy_amount();
+                    let cost = self.portfolio.get_buy_cost();
                     let point = NaiveDateTime::from_timestamp_millis(
                         new_row.column("time")
                             .unwrap()
@@ -101,10 +101,10 @@ where T: BaseMarket {
                             .unwrap()
                             .get(0)
                             .unwrap()).unwrap();
-                    Some(FutureTrade::new(
+                    Some(FutureTrade::new_from_cost(
                         side,
                         rate,
-                        amount,
+                        cost,
                         point
                     ))
                 } else {

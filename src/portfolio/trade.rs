@@ -13,7 +13,7 @@ pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
     fn add_failed_trade(&mut self, trade: FailedTrade);
     fn add_executed_trade(&mut self, trade: ExecutedTrade);
     fn is_rate_profitable(&self, rate: f64) -> Option<FutureTrade>;
-    fn get_buy_amount(&self) -> f64;
+    fn get_buy_cost(&self) -> f64;
     fn get_last_trade(&self) -> Option<ExecutedTrade>;
     fn able_to_buy(&self) -> bool;
 }
@@ -96,7 +96,7 @@ impl TradeHandlers for Portfolio {
     /// The amount of capital to use for a single buy trade
     ///
     /// This number is determined by the amount of capital available and the number of open positions.
-    fn get_buy_amount(&self) -> f64 {
+    fn get_buy_cost(&self) -> f64 {
         self.get_capital() / self.available_open_positions() as f64
     }
 
