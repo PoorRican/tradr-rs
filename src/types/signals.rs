@@ -40,6 +40,18 @@ pub enum Side {
     Buy = BUY,
 }
 
+impl TryFrom<Signal> for Side {
+    type Error = &'static str;
+
+    fn try_from(value: Signal) -> Result<Self, Self::Error> {
+        match value {
+            Signal::Buy => Ok(Side::Buy),
+            Signal::Sell => Ok(Side::Sell),
+            Signal::Hold => Err("Cannot convert Signal::Hold to Side"),
+        }
+    }
+}
+
 impl Serialize for Side {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
