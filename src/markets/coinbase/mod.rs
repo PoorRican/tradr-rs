@@ -47,6 +47,8 @@ pub struct CoinbaseClient {
     api_passphrase: String,
 
     client: reqwest::Client,
+
+    enable_trades: bool,
 }
 
 impl CoinbaseClient {
@@ -64,7 +66,13 @@ impl CoinbaseClient {
             api_secret: "".to_string(),
             api_passphrase: "".to_string(),
             client,
+            enable_trades: true,
         }
+    }
+
+    pub fn disable_trades(mut self) -> Self {
+        self.enable_trades = false;
+        self
     }
 }
 
@@ -111,6 +119,11 @@ impl BaseMarket for CoinbaseClient {
         order: FutureTrade,
         product_id: String,
     ) -> Result<ExecutedTrade, reqwest::Error> {
+        if !self.enable_trades {
+            let trade = ExecutedTrade::with_future_trade(
+                "mock".to_string(), order);
+            return Ok(trade)
+        }
         let request = CoinbaseOrderRequest::with_future_trade(order, product_id);
 
         let url = format!("{}/orders", BASE_URL);
