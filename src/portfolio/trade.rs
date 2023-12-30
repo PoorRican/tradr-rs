@@ -7,12 +7,15 @@ use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, Side, Trade};
 use chrono::{NaiveDateTime, Utc};
 use polars::prelude::DataFrame;
 
-/// Interface methods for storing trades
+/// Interface methods for storing and retrieving trades, and determining when to trade
 pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
     fn get_executed_trades(&self) -> &DataFrame;
     fn add_failed_trade(&mut self, trade: FailedTrade);
     fn add_executed_trade(&mut self, trade: ExecutedTrade);
     fn is_rate_profitable(&self, rate: f64) -> Option<FutureTrade>;
+    fn get_buy_amount(&self) -> f64;
+    fn get_last_trade(&self) -> Option<ExecutedTrade>;
+    fn able_to_buy(&self) -> bool;
 }
 
 impl TradeHandlers for Portfolio {
@@ -88,6 +91,66 @@ impl TradeHandlers for Portfolio {
             }
         }
         None
+    }
+
+    /// The amount of capital to use for a single buy trade
+    ///
+    /// This number is determined by the amount of capital available and the number of open positions.
+    fn get_buy_amount(&self) -> f64 {
+        self.get_capital() / self.available_open_positions() as f64
+    }
+
+    /// Get the most recent trade
+    ///
+    /// # Returns
+    /// * `Some` - The most recent trade
+    /// * `None` - If there are no trades
+    fn get_last_trade(&self) -> Option<ExecutedTrade> {
+        if self.executed_trades.height() > 0 {
+            let last_row = self.executed_trades.tail(Some(1));
+            let trade = ExecutedTrade::from_row(&last_row);
+            Some(trade)
+        } else {
+            None
+        }
+    }
+
+    /// Get a boolean indicating whether or not the portfolio is able to buy.
+    ///
+    /// # Conditions
+    /// Buys are allowed when:
+    /// * There are not too many open positions
+    /// * If the last trade was a sell
+    /// * If the timeout has expired since the last trade
+    ///
+    /// Buys are prevented when:
+    /// * There are too many open positions
+    /// * The last trade was a buy and the timeout has not expired
+    ///
+    /// # Returns
+    /// `true` if the portfolio is able to buy, `false` otherwise
+    ///
+    fn able_to_buy(&self) -> bool {
+        if self.available_open_positions() == 0 {
+            return false;
+        } else {
+            // check the last trade
+            let last_trade = self.get_last_trade();
+            if let Some(trade) = last_trade {
+                if trade.get_side() == Side::Buy {
+                    // check timeout
+                    let now = Utc::now().naive_utc();
+                    let diff = now - *trade.get_point();
+                    return if diff >= self.timeout {
+                        true
+                    } else {
+                        false
+                    }
+                }
+            }
+            // if there was no last trade, or if the last trade was a sell, then we are able to buy
+            true
+        }
     }
 }
 
@@ -240,5 +303,92 @@ mod tests {
         let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 100.0, 1.0, time);
 
         assert!(portfolio.is_rate_profitable(100.1).is_none());
+    }
+
+    #[test]
+    fn test_last_trade() {
+        let mut portfolio = Portfolio::new(200.0, 200.0, None);
+        assert!(portfolio.get_last_trade().is_none());
+
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            Side::Buy,
+            100.0,
+            1.0,
+            Utc::now().naive_utc(),
+        );
+        portfolio.add_executed_trade(trade);
+
+        let last_trade = portfolio.get_last_trade();
+        assert!(portfolio.get_last_trade().is_some());
+
+        // append another trade and assert that the last trade is this new trade
+        let id = "id".to_string();
+        let side = Side::Sell;
+        let price = 121.0;
+        let quantity = 1.0;
+        let time = Utc::now().naive_utc();
+
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            side,
+            price,
+            quantity,
+            time,
+        );
+        portfolio.add_executed_trade(trade);
+
+        let last_trade = portfolio.get_last_trade().unwrap();
+        assert_eq!(last_trade.get_id(), &id);
+        assert_eq!(last_trade.get_side(), side);
+        assert_eq!(last_trade.get_price(), price);
+        assert_eq!(last_trade.get_quantity(), quantity);
+        assert_eq!(last_trade.get_point().timestamp_millis(), time.timestamp_millis());
+    }
+
+    #[test]
+    fn test_able_to_buy() {
+        // test that we are able to buy when there are no open positions
+        let portfolio = Portfolio::new(100.0, 100.0, None);
+        assert!(portfolio.able_to_buy());
+
+        // test that we are able to buy if the last trade is a sell
+        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            Side::Sell,
+            100.0,
+            1.0,
+            Utc::now().naive_utc(),
+        );
+        portfolio.add_executed_trade(trade);
+
+        assert!(portfolio.able_to_buy());
+
+        // test that we are not able to buy if the last trade is a buy and the timeout has not expired
+        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            Side::Buy,
+            100.0,
+            1.0,
+            Utc::now().naive_utc(),
+        );
+        portfolio.add_executed_trade(trade);
+
+        assert!(!portfolio.able_to_buy());
+
+        // test hat we are able to buy if the last trade is a buy and the timeout has expired
+        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            Side::Buy,
+            100.0,
+            1.0,
+            Utc::now().naive_utc() - portfolio.timeout,
+        );
+        portfolio.add_executed_trade(trade);
+
+        assert!(portfolio.able_to_buy());
     }
 }
