@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 /// Abstracts a candlestick
 #[derive(Serialize, Debug, PartialEq)]
 pub struct Candle {
-    #[serde(serialize_with = "crate::time::naive_dt_serializer")]
-    #[serde(deserialize_with = "crate::time::naive_dt_deserializer")]
+    #[serde(serialize_with = "crate::serialization::naive_dt_serializer")]
+    #[serde(deserialize_with = "crate::serialization::naive_dt_deserializer")]
     pub time: NaiveDateTime,
     pub open: f64,
     pub high: f64,
