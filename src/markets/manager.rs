@@ -69,16 +69,16 @@ fn load_candles(file_path: &Path) -> Result<DataFrame, Error> {
 }
 
 
-pub struct CandleManager<T>
+pub struct CandleManager<'a, T>
 where T: BaseMarket {
     candles: HashMap<String, DataFrame>,
     pair: String,
-    market: T,
+    market: &'a T,
 }
 
-impl<T> CandleManager<T>
+impl<'a, T> CandleManager<'a, T>
 where T: BaseMarket {
-    pub fn new(pair: &str, market: T) -> Self {
+    pub fn new(pair: &str, market: &'a T) -> Self {
         // TODO: implement a default path for storing all candle data
         Self {
             candles: HashMap::new(),
@@ -159,8 +159,11 @@ mod tests {
             .unwrap()
     }
 
-    fn create_manager() -> CandleManager<CoinbaseClient> {
-        let market = CoinbaseClient::new();
+    fn build_market() -> CoinbaseClient {
+        CoinbaseClient::new()
+    }
+
+    fn create_manager(market: &CoinbaseClient) -> CandleManager<CoinbaseClient> {
         let mut manager = CandleManager::new("BTC-USD", market);
 
         for interval in VALID_INTERVALS {
@@ -211,10 +214,10 @@ mod tests {
         let path = create_temp_dir(&suffix);
 
         // create some fake candle data
-        let df = create_df();
-        let mut holder = create_manager();
+        let market = build_market();
+        let mut manager = create_manager(&market);
 
-        holder.save(&path).unwrap();
+        manager.save(&path).unwrap();
 
         // check that the files were created
         for i in VALID_INTERVALS.iter() {
@@ -223,11 +226,13 @@ mod tests {
         }
 
         // check the contents of each file
+        let expected = create_df();
+
         for interval in VALID_INTERVALS.iter() {
             let file_path = path.join(format!("{}.csv", interval));
             let loaded = load_candles(&file_path).unwrap();
             assert_eq!(loaded.shape(), (4, 6));
-            assert_eq!(loaded, df);
+            assert_eq!(loaded, expected);
         }
 
         // remove the temp dir
@@ -241,12 +246,14 @@ mod tests {
 
         // create some fake candle data
         let df = create_df();
-        let mut holder = create_manager();
+        let market = build_market();
+        let mut manager = create_manager(&market);
 
-        holder.save(&path).unwrap();
+        manager.save(&path).unwrap();
 
         // load the candle holder
-        let mut loaded = create_manager();
+        let market = build_market();
+        let mut loaded = create_manager(&market);
         loaded.load(&path).unwrap();
 
         // check that values are not None
