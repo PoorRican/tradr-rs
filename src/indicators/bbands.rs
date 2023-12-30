@@ -11,7 +11,7 @@ const DEFAULT_MULTIPLIER: f64 = 2.0;
 const DEFAULT_THRESHOLD: f64 = 0.8;
 const SOURCE_COL_NAME: &str = "close";
 
-struct BBands {
+pub struct BBands {
     period: usize,
     multiplier: f64,
 
