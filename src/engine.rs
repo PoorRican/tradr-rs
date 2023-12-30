@@ -63,7 +63,13 @@ where T: BaseMarket {
             .update(&self.current_interval)
             .await
             .unwrap();
-        assert_eq!(new_row.height(), 1);
+        if new_row.height() == 0 {
+            eprintln!("No new data available");
+            return;
+        } else if new_row.height() > 1 {
+            eprintln!("Multiple new rows available...");
+            return;
+        }
 
         // pass row to strategy
         let signal = self.strategy.process(&new_row);
