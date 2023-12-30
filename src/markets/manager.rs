@@ -79,6 +79,7 @@ where T: BaseMarket {
 impl<T> CandleManager<T>
 where T: BaseMarket {
     pub fn new(pair: &str, market: T) -> Self {
+        // TODO: implement a default path for storing all candle data
         Self {
             candles: HashMap::new(),
             pair: pair.to_string(),

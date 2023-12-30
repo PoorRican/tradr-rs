@@ -70,6 +70,10 @@ impl CoinbaseClient {
 
 #[async_trait]
 impl BaseMarket for CoinbaseClient {
+    fn name(&self) -> &str {
+        "Coinbase"
+    }
+
     async fn get_candles(&self, pair: &str, interval: &str) -> Result<Vec<Candle>, reqwest::Error> {
         assert!(VALID_INTERVALS.iter().any(|x| x[0] == interval));
 

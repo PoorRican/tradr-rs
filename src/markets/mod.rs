@@ -15,6 +15,9 @@ use crate::types::{Candle, ExecutedTrade, FutureTrade};
 /// This interface defines methods for getting candles and submitting orders to the exchange.
 #[async_trait]
 pub trait BaseMarket: Clone {
+    /// Returns the name of the exchange.
+    fn name(&self) -> &str;
+
     /// Returns a list of candles for the given trading pair and interval.
     ///
     /// # Arguments
