@@ -39,7 +39,7 @@ async fn main() {
     let path = Path::new("data");
 
     // bootstrap
-    engine.bootstrap().await;
+    engine.initialize().await;
     engine.save(path)
         .expect("Failed to save data");
 

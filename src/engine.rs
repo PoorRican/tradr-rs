@@ -6,7 +6,7 @@ use crate::markets::{BaseMarket};
 use crate::markets::manager::CandleManager;
 use crate::portfolio::{Portfolio, TradeHandlers, Persistence};
 use crate::strategies::Strategy;
-use crate::types::{FutureTrade, Side};
+use crate::types::{FutureTrade, Side, Signal};
 
 /// The `Engine` is the main entry point for the trading bot.
 ///
@@ -47,11 +47,20 @@ where T: BaseMarket {
         }
     }
 
+    /// Bootstrap indicator data from the current candle
+    ///
+    /// This is used to rerun bootstrapping when there has been more than one candle
+    /// returned from the market, when indicators need to be updated (eg: change of parameters),
+    /// or when the engine is first initialized.
+    fn bootstrap(&mut self) {
+        self.strategy.bootstrap(self.manager.get(&self.current_interval).unwrap().clone());
+    }
+
     /// Bootstrap the engine by fetching candles and bootstrapping the indicators
-    pub async fn bootstrap(&mut self) {
+    pub async fn initialize(&mut self) {
         // TODO: load candles
         self.manager.update_all().await;
-        self.strategy.bootstrap(self.manager.get(&self.current_interval).unwrap().clone());
+        self.bootstrap();
 
         // print last candle time
         let last_candle_time = self.last_candle_time();
@@ -60,6 +69,39 @@ where T: BaseMarket {
         // print feedback
         let time = Utc::now().naive_utc();
         println!("Bootstrapping was completed at {time}");
+    }
+
+    /// Fetch new candle data and process it
+    ///
+    /// This will fetch new candle data from the market, and then process it with the strategy.
+    /// If multiple rows are returned, the engine will bootstrap the strategy and return the last
+    /// row. Otherwise, a single row will be passed to `Strategy::process()`.
+    ///
+    /// # Returns
+    /// `Option<(Signal, DataFrame)>` - A tuple containing the signal and the new candle data
+    /// * `None` if there is no new candle data available
+    /// * `Some((signal, row))` if there is new candle data available
+    async fn fetch_candle_data(&mut self) -> Option<(Signal, DataFrame)> {
+        let new_row = self.manager
+            .update(&self.current_interval)
+            .await
+            .unwrap();
+
+        // get new signal. If there is no new row, return false.
+        // otherwise, process single row or bootstrap
+        if new_row.height() == 0 {
+            return None;
+        } else if new_row.height() > 1 {
+            eprintln!("Got multiple rows. Bootstrapping...");
+            self.bootstrap();
+            let signal = self.strategy.get_last_signal();
+            let last_row = self.get_last_candle();
+            Some((signal, last_row))
+        } else {
+            let signal = self.strategy.process(&new_row);
+            Some((signal, new_row))
+        }
+
     }
 
     /// Run the engine for a single iteration
@@ -72,18 +114,10 @@ where T: BaseMarket {
     /// * `true` if the engine correctly processed new candle data
     /// * `false` if there was no new candle data available. This triggers a retry.
     pub async fn run(&mut self) -> bool {
-        let new_row = self.manager
-            .update(&self.current_interval)
-            .await
-            .unwrap();
-        if new_row.height() == 0 {
-            return false;
-        } else if new_row.height() > 1 {
-            panic!("Too many new rows");
-        }
-
-        // pass row to strategy
-        let signal = self.strategy.process(&new_row);
+        let (signal, new_row) = match self.fetch_candle_data().await {
+            Some((signal, new_row)) => (signal, new_row),
+            None => return false,
+        };
 
         // output time of last candle
         let time = NaiveDateTime::from_timestamp_millis(
@@ -93,7 +127,7 @@ where T: BaseMarket {
                 .unwrap()
                 .get(0)
                 .unwrap()).unwrap();
-        println!("Processed candle for {time}");
+        println!("Processed {signal} for {time}");
 
         // drop all hold values
         let side = match Side::try_from(signal) {
@@ -152,15 +186,21 @@ where T: BaseMarket {
         Ok(())
     }
 
+    /// Get the last candle time
     pub fn last_candle_time(&self) -> NaiveDateTime {
-        let df = self.manager.get(&self.current_interval).unwrap();
+        let df = self.get_last_candle();
         let time = df.column("time")
             .unwrap()
             .datetime()
             .unwrap()
-            .head(Some(1))
             .get(0).unwrap();
         NaiveDateTime::from_timestamp_millis(time).unwrap()
+    }
+
+    /// Get the last candle row
+    fn get_last_candle(&self) -> DataFrame {
+        let df = self.manager.get(&self.current_interval).unwrap();
+        df.head(Some(1))
     }
 }
 
