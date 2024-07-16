@@ -13,18 +13,18 @@ pub enum Signal {
     Buy = BUY,
 }
 
-impl Into<i32> for Signal {
-    fn into(self) -> i32 {
+impl Into<i8> for Signal {
+    fn into(self) -> i8 {
         match self {
-            Signal::Buy => BUY as i32,
+            Signal::Buy => BUY as i8,
             Signal::Hold => 0,
-            Signal::Sell => SELL as i32,
+            Signal::Sell => SELL as i8,
         }
     }
 }
 
-impl From<i32> for Signal {
-    fn from(value: i32) -> Self {
+impl From<i8> for Signal {
+    fn from(value: i8) -> Self {
         match value as isize {
             SELL => Signal::Sell,
             0 => Signal::Hold,
@@ -89,8 +89,8 @@ impl<'de> Deserialize<'de> for Side {
     }
 }
 
-impl From<i32> for Side {
-    fn from(value: i32) -> Self {
+impl From<i8> for Side {
+    fn from(value: i8) -> Self {
         match value as isize {
             SELL => Side::Sell,
             BUY => Side::Buy,
@@ -104,14 +104,14 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_side_from_i32() {
+    fn test_side_from_i8() {
         assert_eq!(Side::from(1), Side::Buy);
         assert_eq!(Side::from(-1), Side::Sell);
     }
 
     #[test]
     #[should_panic]
-    fn test_side_from_i32_panic() {
+    fn test_side_from_i8_panic() {
         let _ = Side::from(0);
     }
 

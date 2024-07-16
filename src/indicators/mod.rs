@@ -164,7 +164,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
             let signal_val = last_row
                 .column("signal")
                 .unwrap()
-                .i32()
+                .i8()
                 .unwrap()
                 .get(0)
                 .unwrap();

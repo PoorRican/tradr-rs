@@ -75,7 +75,7 @@ impl ExecutedTrade {
         assert_eq!(row.height(), 1);
         assert_eq!(row.get_column_names(), &["id", "side", "price", "quantity", "cost", "point"]);
         let id = row.column("id").unwrap().str().unwrap().get(0).unwrap();
-        let side = Side::from(row.column("side").unwrap().i32().unwrap().get(0).unwrap());
+        let side = Side::from(row.column("side").unwrap().i8().unwrap().get(0).unwrap());
         let price = row.column("price").unwrap().f64().unwrap().get(0).unwrap();
         let quantity = row.column("quantity").unwrap().f64().unwrap().get(0).unwrap();
         let cost = row.column("cost").unwrap().f64().unwrap().get(0).unwrap();
@@ -95,7 +95,7 @@ impl AsDataFrame for ExecutedTrade {
     fn as_dataframe(&self) -> DataFrame {
         DataFrame::new(vec![
             Series::new("id", vec![self.id.clone()]),
-            Series::new("side", vec![self.side as i32]),
+            Series::new("side", vec![self.side as i8]),
             Series::new("price", vec![self.price]),
             Series::new("quantity", vec![self.quantity]),
             Series::new("cost", vec![self.cost]),
@@ -220,8 +220,8 @@ mod test {
             &["id", "side", "price", "quantity", "cost", "point"]
         );
         assert_eq!(
-            df.column("side").unwrap().i32().unwrap().get(0).unwrap(),
-            side as i32
+            df.column("side").unwrap().i8().unwrap().get(0).unwrap(),
+            side as i8
         );
         assert_eq!(
             df.column("price").unwrap().f64().unwrap().get(0).unwrap(),
@@ -260,7 +260,7 @@ mod test {
 
         let row = df![
             "id" => ["id"],
-            "side" => [Side::Buy as i32],
+            "side" => [Side::Buy as i8],
             "price" => [1.0],
             "quantity" => [2.0],
             "cost" => [3.0],

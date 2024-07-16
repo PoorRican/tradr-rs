@@ -159,7 +159,7 @@ impl IndicatorSignalHandler for BBands {
                 let signal = calculate_signal(series, close_price, DEFAULT_THRESHOLD);
                 signal.unwrap_or(Signal::Hold).into()
             })
-            .collect::<Vec<i32>>();
+            .collect::<Vec<i8>>();
 
         self.signals = Some(
             df!(
@@ -213,7 +213,7 @@ impl IndicatorSignalHandler for BBands {
                     .unwrap_or(Signal::Hold);
                 signal.into()
             })
-            .collect::<Vec<i32>>();
+            .collect::<Vec<i8>>();
 
         // update the signals
         let df = df!(

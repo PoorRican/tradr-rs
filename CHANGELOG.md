@@ -4,3 +4,4 @@
 - Improve performance of `BBands` by implementing `polars` window functions. Functions are now required to be passed a subset of candle data instead of new rows.
 - Rename `Strategy.get_signals` to `Strategy.get_all_signals`
 - Add `get_name` method to `Indicator` trait
+- Convert `BBands.signals` to use `i8` instead of `i32` for signal type
