@@ -236,7 +236,11 @@ impl IndicatorSignalHandler for BBands {
     }
 }
 
-impl Indicator for BBands {}
+impl Indicator for BBands {
+    fn get_name(&self) -> &'static str {
+        "bbands"
+    }
+}
 
 #[derive(Debug)]
 enum BBandExtractionError {

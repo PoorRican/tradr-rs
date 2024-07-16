@@ -117,6 +117,7 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
 /// 1. [`Indicator::process_existing()`] is called to process historical candle data.
 /// 2. [`Indicator::get_signals()`] is called to get all of the processed signal history.
 pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
+    fn get_name(&self) -> &'static str;
 
     /// Process existing candle data
     ///
