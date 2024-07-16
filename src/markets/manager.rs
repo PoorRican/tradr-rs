@@ -4,7 +4,7 @@ use std::io::Error;
 use std::path::Path;
 use polars::error::PolarsResult;
 use polars::frame::{DataFrame, UniqueKeepStrategy};
-use polars_io::csv::{CsvReader, CsvWriter};
+use polars::prelude::*;
 use polars_io::{SerReader, SerWriter};
 use crate::markets::BaseMarket;
 use crate::traits::AsDataFrame;
@@ -31,7 +31,7 @@ fn append_candles(existing: &DataFrame, new_candles: DataFrame) -> PolarsResult<
 
     let mut unique = appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)?;
 
-    unique.sort(["time"], true, false)
+    unique.sort(["time"], SortMultipleOptions::new().with_order_descending_multi([true, false]))
 }
 
 
@@ -64,10 +64,9 @@ fn load_candles(file_path: &Path) -> Result<DataFrame, Error> {
         ));
     }
 
-    let df = CsvReader::from_path(file_path)
+    let df = CsvReadOptions::default()
+        .try_into_reader_with_file_path(Some(file_path.into()))
         .unwrap()
-        .has_header(true)
-        .with_try_parse_dates(true)
         .finish()
         .unwrap();
     Ok(df)

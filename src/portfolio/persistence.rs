@@ -121,10 +121,9 @@ impl Persistence for Portfolio {
 
         // load executed trades
         let file_path = path.join(EXECUTED_TRADES_FILENAME);
-        let mut executed_trades = CsvReader::from_path(file_path)
+        let mut executed_trades = CsvReadOptions::default()
+            .try_into_reader_with_file_path(Some(file_path.into()))
             .unwrap()
-            .has_header(true)
-            .with_try_parse_dates(true)
             .finish()
             .unwrap();
 
@@ -138,10 +137,9 @@ impl Persistence for Portfolio {
 
         // load failed trades
         let file_path = path.join(FAILED_TRADES_FILENAME);
-        let mut failed_trades = CsvReader::from_path(file_path)
+        let mut failed_trades = CsvReadOptions::default()
+            .try_into_reader_with_file_path(Some(file_path.into()))
             .unwrap()
-            .has_header(true)
-            .with_try_parse_dates(true)
             .finish()
             .unwrap();
 
@@ -166,23 +164,21 @@ impl Persistence for Portfolio {
         // load capital
         let file_path = path.join(CAPITAL_FILENAME);
         let capital_ts = TrackedValue::from(
-            CsvReader::from_path(file_path)
+            CsvReadOptions::default()
+                .try_into_reader_with_file_path(Some(file_path.into()))
                 .unwrap()
-                .has_header(true)
-                .with_try_parse_dates(true)
                 .finish()
-                .unwrap(),
+                .unwrap()
         );
 
         // load assets
         let file_path = path.join(ASSETS_FILENAME);
         let assets_ts = TrackedValue::from(
-            CsvReader::from_path(file_path)
+            CsvReadOptions::default()
+                .try_into_reader_with_file_path(Some(file_path.into()))
                 .unwrap()
-                .has_header(true)
-                .with_try_parse_dates(true)
                 .finish()
-                .unwrap(),
+                .unwrap()
         );
 
         // create the portfolio from the loaded data

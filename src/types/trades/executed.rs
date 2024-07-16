@@ -74,7 +74,7 @@ impl ExecutedTrade {
     pub fn from_row(row: &DataFrame) -> Self {
         assert_eq!(row.height(), 1);
         assert_eq!(row.get_column_names(), &["id", "side", "price", "quantity", "cost", "point"]);
-        let id = row.column("id").unwrap().utf8().unwrap().get(0).unwrap();
+        let id = row.column("id").unwrap().str().unwrap().get(0).unwrap();
         let side = Side::from(row.column("side").unwrap().i32().unwrap().get(0).unwrap());
         let price = row.column("price").unwrap().f64().unwrap().get(0).unwrap();
         let quantity = row.column("quantity").unwrap().f64().unwrap().get(0).unwrap();
@@ -240,7 +240,7 @@ mod test {
             df.column("cost").unwrap().f64().unwrap().get(0).unwrap(),
             cost
         );
-        assert_eq!(df.column("id").unwrap().utf8().unwrap().get(0).unwrap(), id);
+        assert_eq!(df.column("id").unwrap().str().unwrap().get(0).unwrap(), id);
         assert_eq!(
             df.column("point")
                 .unwrap()

@@ -57,22 +57,22 @@ trait IndicatorGraphHandler: IndicatorUtilities {
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with the candle data
-    fn process_existing_candles(&mut self, candles: &DataFrame);
+    fn process_graph_for_existing(&mut self, candles: &DataFrame);
 
     /// Update processed indicator data with new candle data rows
     ///
     /// # Arguments
-    /// * `row` - A single row containing the new candle data
+    /// * `candles` - New candle data. Should be larger than the window and must contain new data.
     ///
     /// # Panics
-    /// * If the DataFrame does not contain exactly one new row
-    fn process_new_candles(&mut self, row: &DataFrame);
+    /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
+    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), ()>;
 
     /// Get the entirety of the calculated indicator data
     ///
     /// # Returns
     /// A reference to the internal indicator graph
-    fn get_indicator_history(&self) -> &Option<DataFrame>;
+    fn get_indicator_history(&self) -> Option<&DataFrame>;
 }
 
 trait IndicatorSignalHandler: IndicatorGraphHandler {
@@ -85,22 +85,22 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with candle data. This is used to determine the signal.
-    fn process_existing_data(&mut self, candles: &DataFrame);
+    fn process_signals_for_existing(&mut self, candles: &DataFrame);
 
     /// Update processed signal data with a new indicator graph row
     ///
     /// # Arguments
-    /// * `row` - A single row containing the new candle data
+    /// * `candles` - New candle data. Should be larger than the window and must contain new data.
     ///
     /// # Panics
-    /// * If the DataFrame does not contain exactly one new row
-    fn process_new_data(&mut self, row: &DataFrame);
+    /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
+    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), ()>;
 
     /// Get the entirety of the calculated signal data
     ///
     /// # Returns
     /// A reference to the internal signal data dataframe
-    fn get_signal_history(&self) -> &Option<DataFrame>;
+    fn get_signal_history(&self) -> Option<&DataFrame>;
 }
 
 /// This trait combines the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended
@@ -126,8 +126,8 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// # Arguments
     /// * `candles` - Historical candle data
     fn process_existing(&mut self, candles: &DataFrame) {
-        self.process_existing_candles(candles);
-        self.process_existing_data(candles);
+        self.process_graph_for_existing(candles);
+        self.process_signals_for_existing(candles);
     }
 
     /// Process new candle data
@@ -136,14 +136,17 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// new candle data as it is received from the market.
     ///
     /// # Arguments
-    /// * `row` - New candle data containing exactly one new row
+    /// * `candles` - New candle data. Should be larger than processing window.
     ///
     /// # Panics
-    /// * If the DataFrame does not contain exactly one new row
-    fn process_new(&mut self, row: &DataFrame) {
-        assert_eq!(row.height(), 1, "DataFrame must contain exactly one new row");
-        self.process_new_candles(row);
-        self.process_new_data(row);
+    /// * If the DataFrame does not contain more than one row
+    fn process_new(&mut self, candles: &DataFrame) -> Result<(), ()> {
+        assert!(candles.height() > 1, "DataFrame must contain more than one row");
+
+        self.process_graph_for_new_candles(candles)?;
+        self.process_signals_for_new_candles(candles)?;
+
+        Ok(())
     }
 
     /// Get the last signal
@@ -178,7 +181,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// * `Some` - The raw signal history. This is a time-series [`DataFrame`] with the columns "time" and "signal".
     ///     Values for "signal" are not converted to the [`Signal`] enum.
     /// * `None` - If there is no signal history
-    fn get_signals(&self) -> &Option<DataFrame> {
+    fn get_signals(&self) -> Option<&DataFrame> {
         self.get_signal_history()
     }
 }

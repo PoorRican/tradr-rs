@@ -14,7 +14,7 @@ type IndicatorContainer = Vec<Box<dyn Indicator>>;
 /// A simple interface is provided for bootstrapping historical candle data, processing new candle data,
 /// and generating a consensus [`Signal`] among all [`Indicator`] objects.
 pub struct Strategy {
-    indicators: IndicatorContainer,
+    pub indicators: IndicatorContainer,
     consensus: Consensus,
 }
 impl Strategy {
@@ -64,5 +64,17 @@ impl Strategy {
             .collect::<Vec<Signal>>();
 
         self.consensus.reduce(signals.into_iter())
+    }
+
+    pub fn get_signals(&self) -> Vec<&DataFrame> {
+        let mut signals = vec![];
+        for indicator in self.indicators.iter() {
+            let signal = indicator.get_signals();
+            match signal {
+                Some(x) => signals.push(x),
+                None => continue,
+            }
+        }
+        signals
     }
 }
