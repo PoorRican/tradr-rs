@@ -66,7 +66,7 @@ impl Strategy {
         self.consensus.reduce(signals.into_iter())
     }
 
-    pub fn get_signals(&self) -> Vec<&DataFrame> {
+    pub fn get_all_signals(&self) -> Vec<&DataFrame> {
         let mut signals = vec![];
         for indicator in self.indicators.iter() {
             let signal = indicator.get_signals();
