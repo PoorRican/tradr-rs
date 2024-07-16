@@ -1,8 +1,11 @@
 use std::env::temp_dir;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
+use chrono::DateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{DataFrameJoinOps, JoinArgs, JoinType};
+use sqlite::Connection;
+use crate::types::Candle;
 
 /// create temp dir for testing
 pub fn create_temp_dir(dir: &Path) -> PathBuf {
@@ -39,6 +42,30 @@ pub fn extract_new_rows(updated: &DataFrame, data: &DataFrame) -> DataFrame {
     updated
         .join(data, ["time"], ["time"], JoinArgs::new(JoinType::Anti))
         .unwrap()
+}
+
+
+pub fn extract_candles_from_db(db_path: &str, table_name: &str) -> Result<Vec<Candle>, ()> {
+    let conn = Connection::open(db_path).unwrap();
+
+    let query = format!("SELECT * FROM {}", table_name);
+    let results = conn
+        .prepare(query)
+        .unwrap()
+        .into_iter()
+        .map(|row| {
+            let data = row.unwrap();
+            Candle {
+                time: DateTime::from_timestamp_millis(data.read::<i64, _>(0)).unwrap().naive_utc(),
+                high: data.read::<f64, _>(1),
+                low: data.read::<f64, _>(2),
+                open: data.read::<f64, _>(3),
+                close: data.read::<f64, _>(4),
+                volume: data.read::<f64, _>(5),
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(results)
 }
 
 
