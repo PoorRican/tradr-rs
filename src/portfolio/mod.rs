@@ -4,6 +4,7 @@ mod persistence;
 mod position;
 mod tracked;
 mod trade;
+mod performance;
 
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
