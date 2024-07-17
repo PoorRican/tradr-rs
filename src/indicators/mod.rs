@@ -6,7 +6,7 @@
 /// 1. [`IndicatorGraphHandler`] - This trait is used to calculate the indicator data from the candle data.
 /// 2. [`IndicatorSignalHandler`] - This trait is used to calculate the signal data from the indicator data.
 ///
-/// While these traits are inherently interlinked, they have been coded separately to allow for
+/// While these traits are inherently interlinked, they've been coded separately to allow for
 /// more flexibility in the future, and easier testing. The [`Indicator`] trait is a combination of
 /// the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended as the primary interface
 /// for processing candle data.
@@ -26,6 +26,38 @@ pub use bbands::BBands;
 
 use polars::prelude::*;
 use crate::types::Signal;
+
+#[derive(Debug)]
+pub enum SignalExtractionError {
+    InvalidSeriesLength,
+    InvalidGraphColumns,
+    IndicesNotAligned,
+    InvalidDataType,
+    CandlesEmpty,
+}
+
+#[derive(Debug)]
+pub enum SignalProcessingError {
+    GraphHistoryMissing,
+    GraphHistoryBehindCandles,
+    DuplicatedCandleTimestamps,
+    GraphIndexNotAlignedWithCandles,
+    ExtractionError(SignalExtractionError),
+}
+
+#[derive(Debug)]
+pub enum GraphProcessingError {
+    InvalidGraphColumns,
+    InvalidGraphLength,
+    CandlesEmpty,
+    DataFrameError(PolarsError)
+}
+
+#[derive(Debug)]
+pub enum IndicatorProcessingError {
+    GraphError(GraphProcessingError),
+    SignalError(SignalProcessingError),
+}
 
 /// Internal functions for indicators
 ///
@@ -54,7 +86,7 @@ trait IndicatorGraphHandler: IndicatorUtilities {
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with the candle data
-    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), ()>;
+    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError>;
 
     /// Update processed indicator data with new candle data rows
     ///
@@ -63,7 +95,7 @@ trait IndicatorGraphHandler: IndicatorUtilities {
     ///
     /// # Panics
     /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
-    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), ()>;
+    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError>;
 
     /// Get the entirety of the calculated indicator data
     ///
@@ -79,7 +111,7 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with candle data. This is used to determine the signal.
-    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), ()>;
+    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError>;
 
     /// Update processed signal data with a new indicator graph row
     ///
@@ -88,7 +120,7 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
     ///
     /// # Panics
     /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
-    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), ()>;
+    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError>;
 
     /// Get the entirety of the calculated signal data
     ///
@@ -109,7 +141,7 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
 ///
 /// For backtesting, the sequence of operations is as follows:
 /// 1. [`Indicator::process_existing()`] is called to process historical candle data.
-/// 2. [`Indicator::get_signals()`] is called to get all of the processed signal history.
+/// 2. [`Indicator::get_signals()`] is called to get all the processed signal history.
 pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     fn get_name(&self) -> &'static str;
 
@@ -120,18 +152,18 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     ///
     /// # Arguments
     /// * `candles` - Historical candle data
-    fn process_existing(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_existing(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
         match self.process_graph(candles) {
             Ok(_) => {},
-            Err(_) => {
-                todo!()
+            Err(e) => {
+                return Err(IndicatorProcessingError::GraphError(e))
             }
         };
 
         match self.process_signals(candles) {
             Ok(_) => {},
-            Err(_) => {
-                todo!()
+            Err(e) => {
+                return Err(IndicatorProcessingError::SignalError(e))
             }
         }
 
@@ -148,11 +180,23 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     ///
     /// # Panics
     /// * If the DataFrame does not contain more than one row
-    fn process_new(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_new(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
         assert!(candles.height() > 1, "DataFrame must contain more than one row");
 
-        self.process_graph_for_new_candles(candles)?;
-        self.process_signals_for_new_candles(candles)?;
+        match self.process_graph(candles) {
+            Ok(_) => {},
+            Err(e) => {
+                return Err(IndicatorProcessingError::GraphError(e))
+            }
+        };
+
+        match self.process_signals(candles) {
+            Ok(_) => {},
+            Err(e) => {
+                return Err(IndicatorProcessingError::SignalError(e))
+            }
+        }
+
 
         Ok(())
     }

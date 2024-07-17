@@ -1,9 +1,6 @@
-use std::cmp::Ordering;
-use crate::indicators::{Indicator, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities};
-use crate::types::Signal;
 use polars::prelude::*;
-use ta::Next;
-use crate::indicators::bbands::BBandExtractionError::IndicesNotAligned;
+use crate::indicators::{GraphProcessingError, Indicator, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities, SignalExtractionError, SignalProcessingError};
+use crate::types::Signal;
 use crate::utils::extract_new_rows;
 
 const DEFAULT_PERIOD: usize = 20;
@@ -40,7 +37,6 @@ fn calculate_bollinger_bands(df: &DataFrame, column_name: &str, periods: usize, 
     )
 }
 
-
 pub struct BBands {
     period: usize,
     multiplier: f64,
@@ -74,22 +70,24 @@ impl Default for BBands {
 }
 
 impl IndicatorGraphHandler for BBands {
-    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError> {
         self.restart_indicator();
 
-        let output = calculate_bollinger_bands(
+        match calculate_bollinger_bands(
             candles,
             SOURCE_COL_NAME,
             DEFAULT_PERIOD,
             DEFAULT_MULTIPLIER
-        ).unwrap();
-
-        self.graph = Some(output);
-
-        Ok(())
+        ) {
+            Ok(output) => {
+                self.graph = Some(output);
+                Ok(())
+            },
+            Err(e) => Err(GraphProcessingError::DataFrameError(e))
+        }
     }
 
-    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError> {
         // TODO: check that height is greater than window/period
         assert_ne!(candles.height(), 1, "Dataframe must contain more than one row.");
 
@@ -133,25 +131,22 @@ impl IndicatorGraphHandler for BBands {
 }
 
 impl IndicatorSignalHandler for BBands {
-    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError> {
         // ensure that the graph history exists
         return match &self.graph {
             None => {
-                // TODO: error enum that graph history is none
-                return Err(())
+                return Err(SignalProcessingError::GraphHistoryMissing)
             },
             Some(history) => {
                 // ensure graph history is aligned with candles
                 let history_aligned = extract_new_rows(candles, history);
                 if history_aligned.height() != 0 {
-                    // TODO: error enum that history is behind candles
-                    return Err(())
+                    return Err(SignalProcessingError::GraphHistoryBehindCandles)
                 }
 
                 // ensure that history and candles are the same number of rows
                 if history.shape().0 != candles.shape().0 {
-                    // TODO: error enum that shapes are incorrect
-                    return Err(())
+                    return Err(SignalProcessingError::GraphIndexNotAlignedWithCandles)
                 }
 
                 match calculate_signal(history, candles, DEFAULT_THRESHOLD) {
@@ -159,42 +154,52 @@ impl IndicatorSignalHandler for BBands {
                         self.signals = Some(signals);
                         Ok(())
                     },
-                    Err(_) => {
-                        // TODO: pass error up (this requires a crate)
-                        Err(())
+                    Err(e) => {
+                        Err(SignalProcessingError::ExtractionError(e))
                     }
                 }
             }
         }
     }
 
-    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError> {
         let new_graph_rows = extract_new_rows(
             self.graph.as_ref().unwrap(),
             self.signals.as_ref().unwrap(),
         );
-        assert_eq!(new_graph_rows.height(), 1, "Indicator graph is too ahead of signals. Call bootstrapping again.");
 
         let new_candle_rows = extract_new_rows(candles, self.signals.as_ref().unwrap());
-        assert_eq!(new_candle_rows.height(), 1, "Passed dataframe might have duplicated timestamps.");
+        if new_candle_rows.height() == 0 {
+            return Ok(());
+        } else if new_candle_rows.height() != 1 {
+            return Err(SignalProcessingError::DuplicatedCandleTimestamps);
+        }
 
-        assert_eq!(
-            new_graph_rows.column("time").unwrap().datetime().unwrap().get(0),
+        let graph_start_index =
+            new_graph_rows
+                .column("time")
+                .unwrap()
+                .datetime()
+                .unwrap()
+                .get(0)
+                .unwrap();
+        let candle_start_index =
             new_candle_rows
                 .column("time")
                 .unwrap()
                 .datetime()
                 .unwrap()
-                .get(0),
-            "Graph row and new candle row must have the same timestamp"
-        );
+                .get(0)
+                .unwrap();
+        if graph_start_index != candle_start_index {
+            return Err(SignalProcessingError::GraphIndexNotAlignedWithCandles);
+        }
 
         let new_signals = calculate_signal(
             &new_graph_rows, &new_candle_rows, DEFAULT_THRESHOLD
         ).unwrap();
 
         if let Some(ref mut signals) = self.signals {
-            println!("{:?}", signals.column("signals").unwrap());
             *signals = signals.vstack(&new_signals).unwrap();
         } else {
             self.signals = Some(new_signals);
@@ -214,14 +219,6 @@ impl Indicator for BBands {
     }
 }
 
-#[derive(Debug)]
-enum BBandExtractionError {
-    InvalidSeriesLength,
-    InvalidGraphColumns,
-    IndicesNotAligned,
-    InvalidDataType,
-    MissingValue,
-}
 
 /// Calculate signal from indicator and close price
 ///
@@ -236,9 +233,9 @@ enum BBandExtractionError {
 ///
 /// # Returns
 /// A `Signal` enum
-fn calculate_signal(graph: &DataFrame, candles: &DataFrame, threshold: f64) -> Result<DataFrame, BBandExtractionError> {
+fn calculate_signal(graph: &DataFrame, candles: &DataFrame, threshold: f64) -> Result<DataFrame, SignalExtractionError> {
     if graph.shape().1 != 4 {
-        return Err(BBandExtractionError::InvalidGraphColumns);
+        return Err(SignalExtractionError::InvalidGraphColumns);
     }
 
     let lower = graph.column("lower").unwrap().f64().unwrap();
@@ -263,8 +260,8 @@ fn calculate_signal(graph: &DataFrame, candles: &DataFrame, threshold: f64) -> R
     // find where the thresholds are exceeded
     let threshold_exceeded = df.lazy().select([
         col("time"),
-        (col("candle_price").lt_eq(col("buy_thresholds"))).alias("buy_signals"),
-        (col("candle_price").gt_eq(col("sell_thresholds"))).alias("sell_signals"),
+        col("candle_price").lt_eq(col("buy_thresholds")).alias("buy_signals"),
+        col("candle_price").gt_eq(col("sell_thresholds")).alias("sell_signals"),
     ]).collect().unwrap();
 
     // combine the buy and sell signals into a single, numerical column
@@ -373,7 +370,9 @@ mod tests {
         )
         .unwrap();
 
-        bb.process_graph(&candles);
+        let _ = bb.process_graph(&candles).unwrap_or_else(
+            |e| panic!("Could not process graph: {:?}", e)
+        );
 
         let history = bb.graph.as_ref().unwrap();
 
@@ -440,7 +439,7 @@ mod tests {
         // create indicator and run `process_existing_candles()`
         let mut bb = super::BBands::new(4, 2.0);
 
-        bb.process_graph(&candles);
+        bb.process_graph(&candles).unwrap_or_else(|e| panic!("Could not process graph: {:?}", e));
 
         // assert that the history aligns with candle dimensions
         assert_eq!(bb.graph.as_ref().unwrap().height(), 5);
@@ -527,7 +526,7 @@ mod tests {
         let mut bb = super::BBands::new(4, 2.0);
         bb.graph = Some(history);
 
-        bb.process_signals(&candles);
+        bb.process_signals(&candles).unwrap_or_else(|e| panic!("Could not process signals: {:?}", e));
 
         bb.signals
             .unwrap()
