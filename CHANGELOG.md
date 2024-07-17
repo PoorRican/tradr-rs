@@ -8,3 +8,4 @@
 - Change `Strategy.get_all_signals` to return a `DataFrame` instead of a `Vec<DataFrame>`
 - In `BBands`, alter `calculate_signals` to accept 2 `DataFrame` objects
 - Create a function `Strategy.get_all_graphs`
+- Rename `BBands.history` to `BBands.graph`

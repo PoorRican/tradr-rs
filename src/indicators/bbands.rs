@@ -45,7 +45,7 @@ pub struct BBands {
     period: usize,
     multiplier: f64,
 
-    history: Option<DataFrame>,
+    graph: Option<DataFrame>,
     signals: Option<DataFrame>,
 }
 
@@ -54,14 +54,14 @@ impl BBands {
         Self {
             period,
             multiplier,
-            history: None,
+            graph: None,
             signals: None,
         }
     }
 }
 impl IndicatorUtilities for BBands {
     fn restart_indicator(&mut self) {
-        self.history = None;
+        self.graph = None;
         self.signals = None;
     }
 
@@ -84,7 +84,7 @@ impl IndicatorGraphHandler for BBands {
             DEFAULT_MULTIPLIER
         ).unwrap();
 
-        self.history = Some(output);
+        self.graph = Some(output);
 
         Ok(())
     }
@@ -94,7 +94,7 @@ impl IndicatorGraphHandler for BBands {
         assert_ne!(candles.height(), 1, "Dataframe must contain more than one row.");
 
         // Ensure candles include new data
-        let extracted = extract_new_rows(candles, self.history.as_ref().unwrap());
+        let extracted = extract_new_rows(candles, self.graph.as_ref().unwrap());
         assert_eq!(extracted.height(), 1, "Dataframe does not have new data.");
 
         // check validity of row
@@ -118,24 +118,24 @@ impl IndicatorGraphHandler for BBands {
             .tail(Some(1));
 
         // update the history
-        if let Some(ref mut history) = self.history {
+        if let Some(ref mut history) = self.graph {
             *history = history.vstack(&new_row).unwrap();
         } else {
-            self.history = Some(new_row);
+            self.graph = Some(new_row);
         }
 
         Ok(())
     }
 
     fn get_indicator_history(&self) -> Option<&DataFrame> {
-        self.history.as_ref()
+        self.graph.as_ref()
     }
 }
 
 impl IndicatorSignalHandler for BBands {
     fn process_signals_for_existing(&mut self, candles: &DataFrame) -> Result<(), ()> {
         // ensure that the graph history exists
-        return match &self.history {
+        return match &self.graph {
             None => {
                 // TODO: error enum that graph history is none
                 return Err(())
@@ -170,7 +170,7 @@ impl IndicatorSignalHandler for BBands {
 
     fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), ()> {
         let new_graph_rows = extract_new_rows(
-            self.history.as_ref().unwrap(),
+            self.graph.as_ref().unwrap(),
             self.signals.as_ref().unwrap(),
         );
         assert_eq!(new_graph_rows.height(), 1, "Indicator graph is too ahead of signals. Call bootstrapping again.");
@@ -311,7 +311,7 @@ mod tests {
         let bb = super::BBands::new(15, 4.0);
         assert_eq!(bb.period, 15);
         assert_eq!(bb.multiplier, 4.0);
-        assert_eq!(bb.history, None);
+        assert_eq!(bb.graph, None);
         assert_eq!(bb.signals, None);
     }
 
@@ -320,14 +320,14 @@ mod tests {
         let bb = super::BBands::default();
         assert_eq!(bb.period, 20);
         assert_eq!(bb.multiplier, 2.0);
-        assert_eq!(bb.history, None);
+        assert_eq!(bb.graph, None);
         assert_eq!(bb.signals, None);
     }
 
     #[test]
     fn test_restart_indicator() {
         let mut bb = super::BBands::new(15, 4.0);
-        bb.history = Some(df!{
+        bb.graph = Some(df!{
             "time" => &[Utc::now().naive_utc()],
             "lower" => &[1.0],
             "middle" => &[2.0],
@@ -341,7 +341,7 @@ mod tests {
 
         bb.restart_indicator();
 
-        assert!(bb.history.is_none());
+        assert!(bb.graph.is_none());
         assert!(bb.signals.is_none());
     }
 
@@ -375,7 +375,7 @@ mod tests {
 
         bb.process_graph_for_existing(&candles);
 
-        let history = bb.history.as_ref().unwrap();
+        let history = bb.graph.as_ref().unwrap();
 
         assert_eq!(history.shape(), (25, 4));
 
@@ -443,7 +443,7 @@ mod tests {
         bb.process_graph_for_existing(&candles);
 
         // assert that the history aligns with candle dimensions
-        assert_eq!(bb.history.as_ref().unwrap().height(), 5);
+        assert_eq!(bb.graph.as_ref().unwrap().height(), 5);
 
         // create a new candle row and run `process_new_row()`
         let new_row = df!(
@@ -461,7 +461,7 @@ mod tests {
         assert!(result.is_ok());
 
         // assert that `history` has been updated with new row
-        let history = bb.history.as_ref().unwrap();
+        let history = bb.graph.as_ref().unwrap();
 
         assert_eq!(history.height(), 6);
         assert_eq!(
@@ -525,7 +525,7 @@ mod tests {
         .collect::<Vec<i8>>();
 
         let mut bb = super::BBands::new(4, 2.0);
-        bb.history = Some(history);
+        bb.graph = Some(history);
 
         bb.process_signals_for_existing(&candles);
 
@@ -578,10 +578,10 @@ mod tests {
 
         // create indicator
         let mut bb = super::BBands::new(4, 2.0);
-        bb.history = Some(history);
+        bb.graph = Some(history);
         bb.signals = Some(signals);
 
-        assert_eq!(bb.history.as_ref().unwrap().height(), 5);
+        assert_eq!(bb.graph.as_ref().unwrap().height(), 5);
         assert_eq!(bb.signals.as_ref().unwrap().height(), 5);
 
         // update history with new row
@@ -592,8 +592,8 @@ mod tests {
             "upper" => &[2.0],
         )
         .unwrap();
-        let history = bb.history.as_ref().unwrap().vstack(&new_history_row).unwrap();
-        bb.history = Some(history);
+        let history = bb.graph.as_ref().unwrap().vstack(&new_history_row).unwrap();
+        bb.graph = Some(history);
 
         let old_candles = df!(
             "time" => date_range.clone(),
