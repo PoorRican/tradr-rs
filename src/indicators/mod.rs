@@ -73,16 +73,13 @@ trait IndicatorGraphHandler: IndicatorUtilities {
 }
 
 trait IndicatorSignalHandler: IndicatorGraphHandler {
-    /// Process signal data for all candle data
+    /// Process signal data and overwrite existing data
     ///
-    /// This is called to "bootstrap" the signal data, meant to be called once at the beginning of the
-    /// runtime.
-    ///
-    /// Any old signal data is cleared.
+    /// This is meant to "bootstrap" the internal indicator graph with historical data.
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with candle data. This is used to determine the signal.
-    fn process_signals_for_existing(&mut self, candles: &DataFrame) -> Result<(), ()>;
+    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), ()>;
 
     /// Update processed signal data with a new indicator graph row
     ///
@@ -131,7 +128,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
             }
         };
 
-        match self.process_signals_for_existing(candles) {
+        match self.process_signals(candles) {
             Ok(_) => {},
             Err(_) => {
                 todo!()

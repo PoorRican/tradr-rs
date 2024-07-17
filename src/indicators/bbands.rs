@@ -133,7 +133,7 @@ impl IndicatorGraphHandler for BBands {
 }
 
 impl IndicatorSignalHandler for BBands {
-    fn process_signals_for_existing(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), ()> {
         // ensure that the graph history exists
         return match &self.graph {
             None => {
@@ -527,7 +527,7 @@ mod tests {
         let mut bb = super::BBands::new(4, 2.0);
         bb.graph = Some(history);
 
-        bb.process_signals_for_existing(&candles);
+        bb.process_signals(&candles);
 
         bb.signals
             .unwrap()

@@ -10,3 +10,4 @@
 - Create a function `Strategy.get_all_graphs`
 - Rename `BBands.history` to `BBands.graph`
 - Rename `IndicatorGraphHandler.process_graph_for_existing` to `process_graph`
+- Rename `IndicatorSignalHandler.process_signals_for_existing` to `process_signals`
