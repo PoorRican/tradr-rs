@@ -9,3 +9,4 @@
 - In `BBands`, alter `calculate_signals` to accept 2 `DataFrame` objects
 - Create a function `Strategy.get_all_graphs`
 - Rename `BBands.history` to `BBands.graph`
+- Rename `IndicatorGraphHandler.process_graph_for_existing` to `process_graph`

@@ -74,7 +74,7 @@ impl Default for BBands {
 }
 
 impl IndicatorGraphHandler for BBands {
-    fn process_graph_for_existing(&mut self, candles: &DataFrame) -> Result<(), ()> {
+    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), ()> {
         self.restart_indicator();
 
         let output = calculate_bollinger_bands(
@@ -373,7 +373,7 @@ mod tests {
         )
         .unwrap();
 
-        bb.process_graph_for_existing(&candles);
+        bb.process_graph(&candles);
 
         let history = bb.graph.as_ref().unwrap();
 
@@ -440,7 +440,7 @@ mod tests {
         // create indicator and run `process_existing_candles()`
         let mut bb = super::BBands::new(4, 2.0);
 
-        bb.process_graph_for_existing(&candles);
+        bb.process_graph(&candles);
 
         // assert that the history aligns with candle dimensions
         assert_eq!(bb.graph.as_ref().unwrap().height(), 5);

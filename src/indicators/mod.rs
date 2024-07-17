@@ -48,16 +48,13 @@ trait IndicatorUtilities {
 /// 1. All candle data is processed at once, and the entire output is stored in a time-series DataFrame
 /// 2. A new candle row is processed, and the output is appended to the time-series DataFrame
 trait IndicatorGraphHandler: IndicatorUtilities {
-    /// Process indicator data for all candle data
+    /// Process indicator data and overwrite existing data
     ///
-    /// This is called to "bootstrap" the indicator data. It is called once at the beginning of the
-    /// runtime.
-    ///
-    /// Any old indicator data is cleared.
+    /// This is meant to "bootstrap" the internal indicator graph with historical data.
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with the candle data
-    fn process_graph_for_existing(&mut self, candles: &DataFrame) -> Result<(), ()>;
+    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), ()>;
 
     /// Update processed indicator data with new candle data rows
     ///
@@ -127,7 +124,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// # Arguments
     /// * `candles` - Historical candle data
     fn process_existing(&mut self, candles: &DataFrame) -> Result<(), ()> {
-        match self.process_graph_for_existing(candles) {
+        match self.process_graph(candles) {
             Ok(_) => {},
             Err(_) => {
                 todo!()
