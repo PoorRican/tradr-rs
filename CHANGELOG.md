@@ -1,4 +1,6 @@
-# v0.2.0
+# CHANGELOG
+
+## v0.2.0
 
 This release adds significant performance to `BBands`, and changes the API for `Strategy` and `Indicator` in preparation for a backtesting implementation.
 
