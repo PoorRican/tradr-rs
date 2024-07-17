@@ -25,7 +25,7 @@ pub const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
 /// # Returns
 /// * `DataFrame` - The updated data frame with new candles
 fn append_candles(existing: &DataFrame, new_candles: DataFrame) -> PolarsResult<DataFrame> {
-    let mut appended = existing.vstack(&new_candles)?;
+    let appended = existing.vstack(&new_candles)?;
 
     let mut unique =
         appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)?;
@@ -250,7 +250,6 @@ mod tests {
         let path = create_temp_dir(&suffix);
 
         // create some fake candle data
-        let df = create_df();
         let market = build_market();
         let mut manager = create_manager(&market);
 

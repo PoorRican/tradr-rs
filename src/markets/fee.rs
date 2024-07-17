@@ -1,4 +1,4 @@
-use crate::types::{Side, Trade};
+use crate::types::Side;
 
 /// A trait for calculating the amounts of fees to be deducted from a trade.
 ///

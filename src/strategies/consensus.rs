@@ -1,5 +1,4 @@
-use crate::strategies::Strategy;
-use crate::types::{FutureTrade, Signal};
+use crate::types::Signal;
 
 /// The [`Consensus`] enum is used to define how a [`Strategy`] should reach a consensus
 /// between multiple [`Indicator`] objects.

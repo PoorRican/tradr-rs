@@ -468,7 +468,7 @@ mod tests {
             None,
         )
         .unwrap();
-        let mut candles = df!(
+        let candles = df!(
             "time" => date_range,
             "open" => &[1, 2, 3, 4, 5],
             "high" => &[1, 2, 3, 4, 5],
