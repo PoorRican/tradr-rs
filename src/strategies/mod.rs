@@ -177,11 +177,102 @@ impl Strategy {
         Ok(None)
     }
 
-    pub fn get_combined_signals(&self) -> Result<Option<DataFrame>, ()> {
-        // TODO: return dataframe with unified (ie: consensus) signal column
+    /// TODO: untested
+    pub fn get_combined_signals(&self) -> Result<Option<DataFrame>, PolarsError> {
+        if let Some(signals) = self.get_all_signals().unwrap() {
+            let mut combined = signals.clone();
+
+            // Sum all signal columns
+            let sum_expr: Vec<Expr> = signals
+                .get_column_names()
+                .into_iter()
+                .filter(|&name| name != "time")
+                .map(|name| col(name))
+                .collect();
+
+            let sum_signals = sum_expr.into_iter().reduce(|acc, x| acc + x).unwrap();
+
+            combined = combined.lazy().with_column(sum_signals.alias("sum_signals")).collect().unwrap();
+
+            // Apply consensus
+            let consensus_expr = match self.consensus {
+                Consensus::Unison => {
+                    let n = self.indicators.len() as i32;
+                    when(col("sum_signals").eq(lit(n)))
+                        .then(lit(1i8))
+                        .when(col("sum_signals").eq(lit(-n)))
+                        .then(lit(-1i8))
+                        .otherwise(lit(0i8))
+                },
+                Consensus::Majority => {
+                    let n = (self.indicators.len() / 2) as i32;
+                    when(col("sum_signals").gt(lit(n)))
+                        .then(lit(1i8))
+                        .when(col("sum_signals").lt(lit(-n)))
+                        .then(lit(-1i8))
+                        .otherwise(lit(0i8))
+                },
+            };
+
+            combined = combined.lazy().with_column(consensus_expr.alias("consensus")).collect().unwrap();
+
+            Ok(Some(combined))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[cfg(test)]
+mod strategy_tests {
+    use super::*;
+    use polars::prelude::*;
+    use crate::indicators::BBands;
+
+    fn setup_strategy_with_indicators() -> Strategy {
+        let bbands = Box::new(BBands::default());
+        Strategy::new(vec![bbands], Consensus::Majority)
+    }
+
+    fn create_dataframe() -> DataFrame {
+        let dates = &["2021-01-01", "2021-01-02", "2021-01-03"];
+        let opens = &[100.0, 200.0, 300.0];
+        let closes = &[150.0, 250.0, 350.0];
+        df![
+            "time" => dates,
+            "open" => opens,
+            "close" => closes,
+        ].unwrap()
+    }
+
+    #[test]
+    fn combined_signals_with_unanimous_buy_signals() {
         todo!()
-        // this can be done by summing the signal columns, and then applying the consensus
-        // ie: if `unison`, and there are 3 columns, then only values of 3/-3 are valid
-        // if `majority` and 3 columns, then values gt/lt 2/-2 are valid, etc, etc
+    }
+
+    #[test]
+    fn combined_signals_with_unanimous_sell_signals() {
+        todo!()
+    }
+
+    #[test]
+    fn combined_signals_with_mixed_signals_majority_buy() {
+        todo!()
+    }
+
+    #[test]
+    fn combined_signals_with_mixed_signals_majority_sell() {
+        todo!()
+    }
+
+    #[test]
+    fn combined_signals_with_no_signals_returns_hold() {
+        todo!()
+    }
+
+
+    #[test]
+    fn combined_signals_with_equal_buy_and_sell_signals_returns_hold() {
+        todo!()
     }
 }

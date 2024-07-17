@@ -2,6 +2,10 @@
 
 ## v0.2.1
 
+### Strategy Improvements
+
+- Implement `Strategy.get_combined_signals` (untested)
+
 ### Portfolio Improvements
 
 - Add performance metrics to `Portfolio`

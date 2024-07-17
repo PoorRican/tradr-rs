@@ -1,5 +1,6 @@
 use polars::prelude::*;
 use crate::portfolio::{CapitalHandlers, Portfolio};
+use std::ops::Mul;
 
 #[derive(Debug)]
 pub struct PerformanceMetrics {
@@ -35,14 +36,15 @@ impl Portfolio {
 
     fn calculate_sharpe_ratio(&self, df: &DataFrame, risk_free_rate: f64) -> Result<f64, PolarsError> {
         let returns = df.select(["cost", "side"])?
-            .apply("cost", |s| {
-                let costs = s.f64().unwrap();
-                let sides = df.column("side").unwrap().utf8().unwrap();
-                let returns = costs.into_iter().zip(sides.into_iter())
-                    .map(|(cost, side)| if side == Some("Buy") { -cost } else { cost })
-                    .collect::<Vec<f64>>();
-                Series::new("returns", returns)
-            })?;
+            .lazy()
+            .with_column(
+                when(col("side").eq(lit("Buy")))
+                    .then(col("cost").mul(lit(-1.0)))
+                    .otherwise(col("cost"))
+                    .alias("returns")
+            )
+            .collect()?;
+        let returns = returns.column("returns")?.f64()?;
 
         let mean_return = returns.mean().unwrap();
         let std_dev = returns.std(0).unwrap();
@@ -51,17 +53,20 @@ impl Portfolio {
     }
 
     fn calculate_max_drawdown(&self, df: &DataFrame) -> Result<f64, PolarsError> {
-        let cumulative_returns = df.select(["cost", "side"])?
+        let mut cumulative_returns = df.select(["cost", "side"])?;
+        let cumulative_returns = cumulative_returns
             .apply("cost", |s| {
                 let costs = s.f64().unwrap();
-                let sides = df.column("side").unwrap().utf8().unwrap();
+                let sides = df.column("side").unwrap().str().unwrap();
                 let mut cumulative = 1.0;
                 let returns = costs.into_iter().zip(sides.into_iter())
                     .map(|(cost, side)| {
-                        if side == Some("Buy") {
-                            cumulative *= 1.0 - cost;
-                        } else {
-                            cumulative *= 1.0 + cost;
+                        if let Some(c) = cost {
+                            if side == Some("Buy") {
+                                cumulative *= 1.0 - c;
+                            } else {
+                                cumulative *= 1.0 + c;
+                            }
                         }
                         cumulative
                     })
@@ -69,8 +74,8 @@ impl Portfolio {
                 Series::new("cumulative_returns", returns)
             })?;
 
-        let peak = cumulative_returns.max().unwrap();
-        let trough = cumulative_returns.min().unwrap();
-        Ok((trough - peak) / peak)
+        let peak: f64 = cumulative_returns.column("cumulative_returns").unwrap().max().unwrap().unwrap();
+        let trough: f64 = cumulative_returns.column("cumulative_returns").unwrap().min().unwrap().unwrap();
+        Ok((trough - peak.clone()) / peak)
     }
 }
