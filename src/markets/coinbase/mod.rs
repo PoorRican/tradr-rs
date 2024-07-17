@@ -1,12 +1,12 @@
 mod order;
 
 use crate::markets::coinbase::order::{CoinbaseOrderRequest, CoinbaseOrderResponse};
+use crate::markets::BaseMarket;
 use crate::markets::{FeeCalculator, Market, SimplePercentageFee};
 use crate::types::{Candle, ExecutedTrade, FutureTrade};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use crate::markets::BaseMarket;
 
 const BASE_URL: &str = "https://api.exchange.coinbase.com";
 
@@ -102,7 +102,6 @@ impl BaseMarket for CoinbaseClient {
         Ok(response)
     }
 
-
     /// Submits an order to the exchange and returns the executed trade.
     ///
     /// This method will only submit FOK orders. Therefore, if the order cannot be filled immediately,
@@ -120,9 +119,8 @@ impl BaseMarket for CoinbaseClient {
         product_id: String,
     ) -> Result<ExecutedTrade, reqwest::Error> {
         if !self.enable_trades {
-            let trade = ExecutedTrade::with_future_trade(
-                "mock".to_string(), order);
-            return Ok(trade)
+            let trade = ExecutedTrade::with_future_trade("mock".to_string(), order);
+            return Ok(trade);
         }
         let request = CoinbaseOrderRequest::with_future_trade(order, product_id);
 
@@ -172,7 +170,6 @@ impl Market for CoinbaseClient {
             .await?;
         Ok(response)
     }
-
 }
 
 #[cfg(test)]

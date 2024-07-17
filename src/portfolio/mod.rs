@@ -7,8 +7,8 @@ mod trade;
 
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
-pub use position::PositionHandlers;
 pub use persistence::Persistence;
+pub use position::PositionHandlers;
 pub use trade::TradeHandlers;
 
 use crate::markets::FeeCalculator;
@@ -121,10 +121,10 @@ impl Portfolio {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
     use super::*;
     use crate::portfolio::{assets::AssetHandlers, capital::CapitalHandlers};
     use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode, Side, Trade};
+    use std::collections::VecDeque;
 
     #[test]
     fn test_with_data() {

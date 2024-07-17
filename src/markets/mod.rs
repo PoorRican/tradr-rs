@@ -59,5 +59,4 @@ pub trait Market: BaseMarket {
 
     /// Returns a list of trading pairs and their info supported by the exchange.
     async fn get_trading_pair_info(&self) -> Result<Vec<Self::PairType>, reqwest::Error>;
-
 }

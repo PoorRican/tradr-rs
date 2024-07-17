@@ -1,6 +1,6 @@
-use std::fmt::{Display, Formatter};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
 
 const BUY: isize = 1;
 const SELL: isize = -1;

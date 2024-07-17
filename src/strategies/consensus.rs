@@ -38,7 +38,7 @@ impl Consensus {
                 } else {
                     Signal::Hold
                 }
-            },
+            }
             Consensus::Majority => {
                 let mut buy = 0;
                 let mut sell = 0;
@@ -57,11 +57,10 @@ impl Consensus {
                 } else {
                     Signal::Hold
                 }
-            },
+            }
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

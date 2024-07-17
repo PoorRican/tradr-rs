@@ -1,18 +1,16 @@
-use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::io::Error;
-use std::path::Path;
+use crate::markets::BaseMarket;
+use crate::traits::AsDataFrame;
+use crate::utils::extract_new_rows;
 use polars::error::PolarsResult;
 use polars::frame::{DataFrame, UniqueKeepStrategy};
 use polars::prelude::*;
 use polars_io::{SerReader, SerWriter};
-use crate::markets::BaseMarket;
-use crate::traits::AsDataFrame;
-use crate::utils::extract_new_rows;
-
+use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::io::Error;
+use std::path::Path;
 
 pub const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
-
 
 /// Updates the existing data frame by appending the new data frame.
 ///
@@ -29,11 +27,14 @@ pub const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
 fn append_candles(existing: &DataFrame, new_candles: DataFrame) -> PolarsResult<DataFrame> {
     let mut appended = existing.vstack(&new_candles)?;
 
-    let mut unique = appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)?;
+    let mut unique =
+        appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)?;
 
-    unique.sort(["time"], SortMultipleOptions::new().with_order_descending_multi([true, false]))
+    unique.sort(
+        ["time"],
+        SortMultipleOptions::new().with_order_descending_multi([true, false]),
+    )
 }
-
 
 fn save_candles(file_path: &Path, data: &mut DataFrame) -> Result<(), Error> {
     if file_path.is_dir() {
@@ -72,16 +73,19 @@ fn load_candles(file_path: &Path) -> Result<DataFrame, Error> {
     Ok(df)
 }
 
-
 pub struct CandleManager<'a, T>
-where T: BaseMarket {
+where
+    T: BaseMarket,
+{
     candles: HashMap<String, DataFrame>,
     pair: String,
     market: &'a T,
 }
 
 impl<'a, T> CandleManager<'a, T>
-where T: BaseMarket {
+where
+    T: BaseMarket,
+{
     pub fn new(pair: &str, market: &'a T) -> Self {
         // TODO: implement a default path for storing all candle data
         Self {
@@ -96,9 +100,7 @@ where T: BaseMarket {
     }
 
     pub async fn update(&mut self, interval: &str) -> Option<DataFrame> {
-        let candles = self.market.get_candles(&self.pair, interval)
-            .await
-            .unwrap();
+        let candles = self.market.get_candles(&self.pair, interval).await.unwrap();
         let df = candles.as_dataframe();
         match self.candles.get(interval) {
             Some(existing) => {
@@ -138,16 +140,15 @@ where T: BaseMarket {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::markets::manager::{load_candles, CandleManager, VALID_INTERVALS};
+    use crate::markets::CoinbaseClient;
+    use crate::utils::create_temp_dir;
+    use polars::frame::DataFrame;
+    use polars::prelude::*;
     use std::fs::remove_dir_all;
     use std::path::Path;
-    use polars::prelude::*;
-    use polars::frame::DataFrame;
-    use crate::markets::CoinbaseClient;
-    use crate::markets::manager::{CandleManager, load_candles, VALID_INTERVALS};
-    use crate::utils::create_temp_dir;
 
     const TEST_DIR: &str = "candle_manager_testing";
 
@@ -160,7 +161,7 @@ mod tests {
             "close" => &[1.0, 2.0, 3.0, 4.0],
             "volume" => &[1.0, 2.0, 3.0, 4.0]
         )
-            .unwrap()
+        .unwrap()
     }
 
     fn build_market() -> CoinbaseClient {
@@ -191,7 +192,7 @@ mod tests {
             "close" => &[5.0, 6.0],
             "volume" => &[5.0, 6.0]
         )
-            .unwrap();
+        .unwrap();
 
         // update the existing data frame with the new data frame
         let updated = super::append_candles(&df, new_df).unwrap();
@@ -286,7 +287,7 @@ mod tests {
             "close" => &[5.0, 6.0],
             "volume" => &[5.0, 6.0]
         ]
-            .unwrap();
+        .unwrap();
 
         // update the existing data frame with the new data frame
         let updated = super::append_candles(&df, new_df).unwrap();

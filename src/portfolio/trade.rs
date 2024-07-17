@@ -141,11 +141,7 @@ impl TradeHandlers for Portfolio {
                     // check timeout
                     let now = Utc::now().naive_utc();
                     let diff = now - *trade.get_point();
-                    return if diff >= self.timeout {
-                        true
-                    } else {
-                        false
-                    }
+                    return if diff >= self.timeout { true } else { false };
                 }
             }
             // if there was no last trade, or if the last trade was a sell, then we are able to buy
@@ -329,13 +325,7 @@ mod tests {
         let quantity = 1.0;
         let time = Utc::now().naive_utc();
 
-        let trade = ExecutedTrade::new_without_cost(
-            "id".to_string(),
-            side,
-            price,
-            quantity,
-            time,
-        );
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), side, price, quantity, time);
         portfolio.add_executed_trade(trade);
 
         let last_trade = portfolio.get_last_trade().unwrap();
@@ -343,7 +333,10 @@ mod tests {
         assert_eq!(last_trade.get_side(), side);
         assert_eq!(last_trade.get_price(), price);
         assert_eq!(last_trade.get_quantity(), quantity);
-        assert_eq!(last_trade.get_point().timestamp_millis(), time.timestamp_millis());
+        assert_eq!(
+            last_trade.get_point().timestamp_millis(),
+            time.timestamp_millis()
+        );
     }
 
     #[test]

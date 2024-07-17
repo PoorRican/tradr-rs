@@ -73,11 +73,20 @@ impl ExecutedTrade {
 
     pub fn from_row(row: &DataFrame) -> Self {
         assert_eq!(row.height(), 1);
-        assert_eq!(row.get_column_names(), &["id", "side", "price", "quantity", "cost", "point"]);
+        assert_eq!(
+            row.get_column_names(),
+            &["id", "side", "price", "quantity", "cost", "point"]
+        );
         let id = row.column("id").unwrap().str().unwrap().get(0).unwrap();
         let side = Side::from(row.column("side").unwrap().i8().unwrap().get(0).unwrap());
         let price = row.column("price").unwrap().f64().unwrap().get(0).unwrap();
-        let quantity = row.column("quantity").unwrap().f64().unwrap().get(0).unwrap();
+        let quantity = row
+            .column("quantity")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
         let cost = row.column("cost").unwrap().f64().unwrap().get(0).unwrap();
         let point = NaiveDateTime::from_timestamp_millis(
             row.column("point")
@@ -86,7 +95,8 @@ impl ExecutedTrade {
                 .unwrap()
                 .get(0)
                 .unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         ExecutedTrade::new(id.to_string(), side, price, quantity, cost, point)
     }
 }
@@ -265,7 +275,8 @@ mod test {
             "quantity" => [2.0],
             "cost" => [3.0],
             "point" => [time]
-        ].unwrap();
+        ]
+        .unwrap();
         let trade = ExecutedTrade::from_row(&row);
 
         assert_eq!(trade.id, "id");

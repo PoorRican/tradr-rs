@@ -1,13 +1,15 @@
-use polars::prelude::*;
-use crate::indicators::{GraphProcessingError, Indicator, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities, SignalExtractionError, SignalProcessingError};
+use crate::indicators::{
+    GraphProcessingError, Indicator, IndicatorGraphHandler, IndicatorSignalHandler,
+    IndicatorUtilities, SignalExtractionError, SignalProcessingError,
+};
 use crate::types::Signal;
 use crate::utils::extract_new_rows;
+use polars::prelude::*;
 
 const DEFAULT_PERIOD: usize = 20;
 const DEFAULT_MULTIPLIER: f64 = 2.0;
 const DEFAULT_THRESHOLD: f64 = 0.8;
 const DEFAULT_SOURCE_COL_NAME: &str = "close";
-
 
 pub struct BBands {
     // Bollinger Bands parameters
@@ -70,12 +72,12 @@ impl BBands {
         ]
     }
 }
+
 impl IndicatorUtilities for BBands {
     fn restart_indicator(&mut self) {
         self.graph = None;
         self.signals = None;
     }
-
 }
 
 impl Default for BBands {
@@ -92,14 +94,21 @@ impl IndicatorGraphHandler for BBands {
             Ok(output) => {
                 self.graph = Some(output);
                 Ok(())
-            },
-            Err(e) => Err(GraphProcessingError::DataFrameError(e))
+            }
+            Err(e) => Err(GraphProcessingError::DataFrameError(e)),
         }
     }
 
-    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError> {
+    fn process_graph_for_new_candles(
+        &mut self,
+        candles: &DataFrame,
+    ) -> Result<(), GraphProcessingError> {
         // TODO: check that height is greater than window/period
-        assert_ne!(candles.height(), 1, "Dataframe must contain more than one row.");
+        assert_ne!(
+            candles.height(),
+            1,
+            "Dataframe must contain more than one row."
+        );
 
         // Ensure candles include new data
         let extracted = extract_new_rows(candles, self.graph.as_ref().unwrap());
@@ -113,12 +122,10 @@ impl IndicatorGraphHandler for BBands {
         );
 
         // recalculate bollinger bands for a limited subset
-        let last = candles
-            .tail(Some(self.period));
+        let last = candles.tail(Some(self.period));
         let output = self.calculate_bollinger_bands(&last).unwrap();
 
-        let new_row = output
-            .tail(Some(1));
+        let new_row = output.tail(Some(1));
 
         // update the history
         if let Some(ref mut history) = self.graph {
@@ -139,39 +146,36 @@ impl IndicatorSignalHandler for BBands {
     fn process_signals(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError> {
         // ensure that the graph history exists
         return match &self.graph {
-            None => {
-                return Err(SignalProcessingError::GraphHistoryMissing)
-            },
+            None => return Err(SignalProcessingError::GraphHistoryMissing),
             Some(history) => {
                 // ensure graph history is aligned with candles
                 let history_aligned = extract_new_rows(candles, history);
                 if history_aligned.height() != 0 {
-                    return Err(SignalProcessingError::GraphHistoryBehindCandles)
+                    return Err(SignalProcessingError::GraphHistoryBehindCandles);
                 }
 
                 // ensure that history and candles are the same number of rows
                 if history.shape().0 != candles.shape().0 {
-                    return Err(SignalProcessingError::GraphIndexNotAlignedWithCandles)
+                    return Err(SignalProcessingError::GraphIndexNotAlignedWithCandles);
                 }
 
                 match self.extract_signals(history, candles) {
                     Ok(signals) => {
                         self.signals = Some(signals);
                         Ok(())
-                    },
-                    Err(e) => {
-                        Err(SignalProcessingError::ExtractionError(e))
                     }
+                    Err(e) => Err(SignalProcessingError::ExtractionError(e)),
                 }
             }
-        }
+        };
     }
 
-    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError> {
-        let new_graph_rows = extract_new_rows(
-            self.graph.as_ref().unwrap(),
-            self.signals.as_ref().unwrap(),
-        );
+    fn process_signals_for_new_candles(
+        &mut self,
+        candles: &DataFrame,
+    ) -> Result<(), SignalProcessingError> {
+        let new_graph_rows =
+            extract_new_rows(self.graph.as_ref().unwrap(), self.signals.as_ref().unwrap());
 
         let new_candle_rows = extract_new_rows(candles, self.signals.as_ref().unwrap());
         if new_candle_rows.height() == 0 {
@@ -180,27 +184,27 @@ impl IndicatorSignalHandler for BBands {
             return Err(SignalProcessingError::DuplicatedCandleTimestamps);
         }
 
-        let graph_start_index =
-            new_graph_rows
-                .column("time")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .get(0)
-                .unwrap();
-        let candle_start_index =
-            new_candle_rows
-                .column("time")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .get(0)
-                .unwrap();
+        let graph_start_index = new_graph_rows
+            .column("time")
+            .unwrap()
+            .datetime()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        let candle_start_index = new_candle_rows
+            .column("time")
+            .unwrap()
+            .datetime()
+            .unwrap()
+            .get(0)
+            .unwrap();
         if graph_start_index != candle_start_index {
             return Err(SignalProcessingError::GraphIndexNotAlignedWithCandles);
         }
 
-        let new_signals = self.extract_signals(&new_graph_rows, &new_candle_rows).unwrap();
+        let new_signals = self
+            .extract_signals(&new_graph_rows, &new_candle_rows)
+            .unwrap();
 
         if let Some(ref mut signals) = self.signals {
             *signals = signals.vstack(&new_signals).unwrap();
@@ -226,7 +230,11 @@ impl IndicatorSignalHandler for BBands {
     ///
     /// # Returns
     /// A DataFrame with time and signals columns
-    fn extract_signals(&self, graph: &DataFrame, candles: &DataFrame) -> Result<DataFrame, SignalExtractionError> {
+    fn extract_signals(
+        &self,
+        graph: &DataFrame,
+        candles: &DataFrame,
+    ) -> Result<DataFrame, SignalExtractionError> {
         if graph.shape().1 != 4 {
             return Err(SignalExtractionError::InvalidGraphColumns);
         }
@@ -235,7 +243,12 @@ impl IndicatorSignalHandler for BBands {
         let middle = graph.column("middle").unwrap().f64().unwrap();
         let upper = graph.column("upper").unwrap().f64().unwrap();
 
-        let candle_price = candles.column(DEFAULT_SOURCE_COL_NAME).unwrap().f64().unwrap().clone();
+        let candle_price = candles
+            .column(DEFAULT_SOURCE_COL_NAME)
+            .unwrap()
+            .f64()
+            .unwrap()
+            .clone();
 
         let buy_threshold = middle.clone() - (middle.clone() - lower.clone()) * self.threshold;
         let sell_threshold = middle.clone() + (upper.clone() - middle.clone()) * self.threshold;
@@ -248,41 +261,57 @@ impl IndicatorSignalHandler for BBands {
             "buy_thresholds" => buy_threshold.into_series(),
             "sell_thresholds" => sell_threshold.into_series(),
             "candle_price" => candle_price.into_series()
-        ].unwrap();
+        ]
+        .unwrap();
 
         // find where the thresholds are exceeded
-        let threshold_exceeded = df.lazy().select([
-            col("time"),
-            col("candle_price").lt_eq(col("buy_thresholds")).alias("buy_signals"),
-            col("candle_price").gt_eq(col("sell_thresholds")).alias("sell_signals"),
-        ]).collect().unwrap();
+        let threshold_exceeded = df
+            .lazy()
+            .select([
+                col("time"),
+                col("candle_price")
+                    .lt_eq(col("buy_thresholds"))
+                    .alias("buy_signals"),
+                col("candle_price")
+                    .gt_eq(col("sell_thresholds"))
+                    .alias("sell_signals"),
+            ])
+            .collect()
+            .unwrap();
 
         // combine the buy and sell signals into a single, numerical column
-        let signals = threshold_exceeded.lazy()
-            .with_column(when(col("sell_signals").eq(lit(true)))
-                .then(Signal::Sell as i8)
-                .otherwise(col("buy_signals").cast(DataType::Int8)).alias("trade_signals"))
-            .collect().unwrap();
+        let signals = threshold_exceeded
+            .lazy()
+            .with_column(
+                when(col("sell_signals").eq(lit(true)))
+                    .then(Signal::Sell as i8)
+                    .otherwise(col("buy_signals").cast(DataType::Int8))
+                    .alias("trade_signals"),
+            )
+            .collect()
+            .unwrap();
 
         // select only the time and trade_signals columns and cast the trade_signals column to an i8
-        let signals = signals.lazy()
-            .select([
-                col("time"),
-                col("trade_signals").cast(DataType::Int8)
-            ]).collect().unwrap();
+        let signals = signals
+            .lazy()
+            .select([col("time"), col("trade_signals").cast(DataType::Int8)])
+            .collect()
+            .unwrap();
 
         // replace all null values with 0
-        let signals = signals.lazy()
-            .with_column(when(col("trade_signals").is_null())
+        let signals = signals.lazy().with_column(
+            when(col("trade_signals").is_null())
                 .then(Signal::Hold as i8)
-                .otherwise(col("trade_signals")).alias("signals"));
+                .otherwise(col("trade_signals"))
+                .alias("signals"),
+        );
 
         // select only the time and signals columns
-        let signals = signals.lazy()
-            .select([
-                col("time"),
-                col("signals")
-            ]).collect().unwrap();
+        let signals = signals
+            .lazy()
+            .select([col("time"), col("signals")])
+            .collect()
+            .unwrap();
 
         Ok(signals)
     }
@@ -293,7 +322,6 @@ impl Indicator for BBands {
         "bbands"
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -325,17 +353,23 @@ mod tests {
     #[test]
     fn test_restart_indicator() {
         let mut bb = super::BBands::new(15, 4.0);
-        bb.graph = Some(df!{
-            "time" => &[Utc::now().naive_utc()],
-            "lower" => &[1.0],
-            "middle" => &[2.0],
-            "upper" => &[3.0],
-        }.unwrap());
+        bb.graph = Some(
+            df! {
+                "time" => &[Utc::now().naive_utc()],
+                "lower" => &[1.0],
+                "middle" => &[2.0],
+                "upper" => &[3.0],
+            }
+            .unwrap(),
+        );
 
-        bb.signals = Some(df!{
-            "time" => &[Utc::now().naive_utc()],
-            "signals" => &[1],
-        }.unwrap());
+        bb.signals = Some(
+            df! {
+                "time" => &[Utc::now().naive_utc()],
+                "signals" => &[1],
+            }
+            .unwrap(),
+        );
 
         bb.restart_indicator();
 
@@ -371,9 +405,9 @@ mod tests {
         )
         .unwrap();
 
-        let _ = bb.process_graph(&candles).unwrap_or_else(
-            |e| panic!("Could not process graph: {:?}", e)
-        );
+        let _ = bb
+            .process_graph(&candles)
+            .unwrap_or_else(|e| panic!("Could not process graph: {:?}", e));
 
         let history = bb.graph.as_ref().unwrap();
 
@@ -385,26 +419,38 @@ mod tests {
                 history.column("time").unwrap().datetime().unwrap().get(i),
                 date_range.get(i)
             );
-        };
+        }
 
         // ensure that upper and lower bounds have null values
         for i in 0..19 {
-            assert_eq!(
-                history.column("lower").unwrap().f64().unwrap().get(i),
-                None
-            );
-            assert_eq!(
-                history.column("upper").unwrap().f64().unwrap().get(i),
-                None
-            );
+            assert_eq!(history.column("lower").unwrap().f64().unwrap().get(i), None);
+            assert_eq!(history.column("upper").unwrap().f64().unwrap().get(i), None);
         }
 
         // ensure that upper/lower bounds have generally correct values
         // ensure that middle band is correct
         for i in 19..25 {
             // check for general ranges
-            assert!(history.column("lower").unwrap().f64().unwrap().get(i).unwrap() < i as f64 - 2.0);
-            assert!(history.column("upper").unwrap().f64().unwrap().get(i).unwrap() > i as f64 + 2.0);
+            assert!(
+                history
+                    .column("lower")
+                    .unwrap()
+                    .f64()
+                    .unwrap()
+                    .get(i)
+                    .unwrap()
+                    < i as f64 - 2.0
+            );
+            assert!(
+                history
+                    .column("upper")
+                    .unwrap()
+                    .f64()
+                    .unwrap()
+                    .get(i)
+                    .unwrap()
+                    > i as f64 + 2.0
+            );
         }
     }
 
@@ -435,7 +481,8 @@ mod tests {
         // create indicator and run `process_existing_candles()`
         let mut bb = super::BBands::new(4, 2.0);
 
-        bb.process_graph(&candles).unwrap_or_else(|e| panic!("Could not process graph: {:?}", e));
+        bb.process_graph(&candles)
+            .unwrap_or_else(|e| panic!("Could not process graph: {:?}", e));
 
         // assert that the history aligns with candle dimensions
         assert_eq!(bb.graph.as_ref().unwrap().height(), 5);
@@ -522,7 +569,8 @@ mod tests {
         let mut bb = super::BBands::new(4, 2.0);
         bb.graph = Some(history);
 
-        bb.process_signals(&candles).unwrap_or_else(|e| panic!("Could not process signals: {:?}", e));
+        bb.process_signals(&candles)
+            .unwrap_or_else(|e| panic!("Could not process signals: {:?}", e));
 
         bb.signals
             .unwrap()
@@ -597,7 +645,7 @@ mod tests {
             "low" => &[1, 2, 3, 4, 5],
             "close" => &[0.9, 1.1, 1.3, 1.7, 1.9],
             "volume" => &[1, 2, 3, 4, 5])
-            .unwrap();
+        .unwrap();
         let new_row = df!(
             "time" => &[time],
             "open" => &[6],
@@ -605,7 +653,7 @@ mod tests {
             "low" => &[6],
             "close" => &[6.0],
             "volume" => &[6])
-            .unwrap();
+        .unwrap();
 
         let candles = old_candles.vstack(&new_row).unwrap();
 

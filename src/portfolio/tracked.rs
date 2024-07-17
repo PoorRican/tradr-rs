@@ -64,7 +64,10 @@ impl TrackedValue {
         // find last row
         let last_row = self
             .0
-            .sort(["timestamp"], SortMultipleOptions::default().with_nulls_last_multi([false, true]))
+            .sort(
+                ["timestamp"],
+                SortMultipleOptions::default().with_nulls_last_multi([false, true]),
+            )
             .unwrap()
             .tail(Some(1));
 

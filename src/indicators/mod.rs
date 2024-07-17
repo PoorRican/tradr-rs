@@ -24,8 +24,8 @@ mod bbands;
 // Re-exports
 pub use bbands::BBands;
 
-use polars::prelude::*;
 use crate::types::Signal;
+use polars::prelude::*;
 
 #[derive(Debug)]
 pub enum SignalExtractionError {
@@ -50,7 +50,7 @@ pub enum GraphProcessingError {
     InvalidGraphColumns,
     InvalidGraphLength,
     CandlesEmpty,
-    DataFrameError(PolarsError)
+    DataFrameError(PolarsError),
 }
 
 #[derive(Debug)]
@@ -95,7 +95,10 @@ trait IndicatorGraphHandler: IndicatorUtilities {
     ///
     /// # Panics
     /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
-    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError>;
+    fn process_graph_for_new_candles(
+        &mut self,
+        candles: &DataFrame,
+    ) -> Result<(), GraphProcessingError>;
 
     /// Get the entirety of the calculated indicator data
     ///
@@ -120,7 +123,10 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
     ///
     /// # Panics
     /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
-    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError>;
+    fn process_signals_for_new_candles(
+        &mut self,
+        candles: &DataFrame,
+    ) -> Result<(), SignalProcessingError>;
 
     /// Get the entirety of the calculated signal data
     ///
@@ -128,7 +134,11 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
     /// A reference to the internal signal data dataframe
     fn get_signal_history(&self) -> Option<&DataFrame>;
 
-    fn extract_signals(&self, graph: &DataFrame, candles: &DataFrame) -> Result<DataFrame, SignalExtractionError>;
+    fn extract_signals(
+        &self,
+        graph: &DataFrame,
+        candles: &DataFrame,
+    ) -> Result<DataFrame, SignalExtractionError>;
 }
 
 /// This trait combines the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended
@@ -156,17 +166,13 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// * `candles` - Historical candle data
     fn process_existing(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
         match self.process_graph(candles) {
-            Ok(_) => {},
-            Err(e) => {
-                return Err(IndicatorProcessingError::GraphError(e))
-            }
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
         };
 
         match self.process_signals(candles) {
-            Ok(_) => {},
-            Err(e) => {
-                return Err(IndicatorProcessingError::SignalError(e))
-            }
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
         }
 
         Ok(())
@@ -183,22 +189,20 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// # Panics
     /// * If the DataFrame does not contain more than one row
     fn process_new(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
-        assert!(candles.height() > 1, "DataFrame must contain more than one row");
+        assert!(
+            candles.height() > 1,
+            "DataFrame must contain more than one row"
+        );
 
         match self.process_graph(candles) {
-            Ok(_) => {},
-            Err(e) => {
-                return Err(IndicatorProcessingError::GraphError(e))
-            }
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
         };
 
         match self.process_signals(candles) {
-            Ok(_) => {},
-            Err(e) => {
-                return Err(IndicatorProcessingError::SignalError(e))
-            }
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
         }
-
 
         Ok(())
     }
@@ -212,8 +216,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// * `None` - If there is no signal history
     fn get_last_signal(&self) -> Option<Signal> {
         if let Some(signal_history) = self.get_signal_history() {
-            let last_row = signal_history
-                .tail(Some(1));
+            let last_row = signal_history.tail(Some(1));
             let signal_val = last_row
                 .column("signal")
                 .unwrap()

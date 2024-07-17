@@ -168,7 +168,7 @@ impl Persistence for Portfolio {
                 .try_into_reader_with_file_path(Some(file_path.into()))
                 .unwrap()
                 .finish()
-                .unwrap()
+                .unwrap(),
         );
 
         // load assets
@@ -178,7 +178,7 @@ impl Persistence for Portfolio {
                 .try_into_reader_with_file_path(Some(file_path.into()))
                 .unwrap()
                 .finish()
-                .unwrap()
+                .unwrap(),
         );
 
         // create the portfolio from the loaded data

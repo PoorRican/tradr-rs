@@ -1,11 +1,11 @@
-use std::env::temp_dir;
-use std::fs::{create_dir_all, remove_dir_all};
-use std::path::{Path, PathBuf};
+use crate::types::Candle;
 use chrono::DateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{DataFrameJoinOps, JoinArgs, JoinType};
 use sqlite::Connection;
-use crate::types::Candle;
+use std::env::temp_dir;
+use std::fs::{create_dir_all, remove_dir_all};
+use std::path::{Path, PathBuf};
 
 /// create temp dir for testing
 pub fn create_temp_dir(dir: &Path) -> PathBuf {
@@ -44,7 +44,6 @@ pub fn extract_new_rows(updated: &DataFrame, data: &DataFrame) -> DataFrame {
         .unwrap()
 }
 
-
 pub fn extract_candles_from_db(db_path: &str, table_name: &str) -> Result<Vec<Candle>, ()> {
     let conn = Connection::open(db_path).unwrap();
 
@@ -56,7 +55,9 @@ pub fn extract_candles_from_db(db_path: &str, table_name: &str) -> Result<Vec<Ca
         .map(|row| {
             let data = row.unwrap();
             Candle {
-                time: DateTime::from_timestamp_millis(data.read::<i64, _>(0)).unwrap().naive_utc(),
+                time: DateTime::from_timestamp_millis(data.read::<i64, _>(0))
+                    .unwrap()
+                    .naive_utc(),
                 high: data.read::<f64, _>(1),
                 low: data.read::<f64, _>(2),
                 open: data.read::<f64, _>(3),
@@ -67,7 +68,6 @@ pub fn extract_candles_from_db(db_path: &str, table_name: &str) -> Result<Vec<Ca
         .collect::<Vec<_>>();
     Ok(results)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -85,7 +85,7 @@ mod tests {
             "close" => &[1, 2, 3, 45, 55],
             "volume" => &[1, 2, 3, 46, 56],
         )
-            .unwrap();
+        .unwrap();
 
         let indicator_data = df!(
             "time" => &[1, 2, 3],
@@ -95,7 +95,7 @@ mod tests {
             "close" => &[1, 2, 3],
             "volume" => &[1, 2, 3],
         )
-            .unwrap();
+        .unwrap();
 
         let new_rows = extract_new_rows(&candles, &indicator_data);
 
