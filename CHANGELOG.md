@@ -2,7 +2,10 @@
 
 ## v0.2.1
 
+### Indicator Improvements
+
 - Add `Err` return values to `BBands.process_graph_for_new_candles()`
+- Formally test `BBands.process_graph_for_new_candles()`
 
 ---
 

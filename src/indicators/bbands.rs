@@ -11,6 +11,7 @@ const DEFAULT_MULTIPLIER: f64 = 2.0;
 const DEFAULT_THRESHOLD: f64 = 0.8;
 const DEFAULT_SOURCE_COL_NAME: &str = "close";
 
+#[derive(Debug, Clone)]
 pub struct BBands {
     // Bollinger Bands parameters
     period: usize,
@@ -324,9 +325,10 @@ impl Indicator for BBands {
 mod tests {
     use chrono::Utc;
     use polars::prelude::*;
+    use rand::Rng;
 
     use crate::indicators::bbands::{DEFAULT_MULTIPLIER, DEFAULT_PERIOD};
-    use crate::indicators::{IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities};
+    use crate::indicators::{BBands, IndicatorGraphHandler, IndicatorSignalHandler, IndicatorUtilities};
     use crate::types::Signal;
 
     #[test]
@@ -683,5 +685,87 @@ mod tests {
                 .unwrap(),
             Signal::Sell as i8
         );
+    }
+
+
+    #[test]
+    fn test_bbands_window_calculation() {
+        // Set up test parameters
+        let total_candles = 100;
+        let subset_size = 30;
+
+        // Generate random candle data
+        let mut rng = rand::thread_rng();
+        let time = Utc::now().naive_utc();
+        let date_range = date_range(
+            "time",
+            time - chrono::Duration::minutes(total_candles as i64),
+            time,
+            Duration::parse("1m"),
+            ClosedWindow::Left,
+            TimeUnit::Milliseconds,
+            None,
+        )
+            .unwrap();
+
+        let close_prices: Vec<f64> = (0..total_candles).map(|_| rng.gen_range(1.0..100.0)).collect();
+
+        let candles = df!(
+            "time" => date_range.clone(),
+            "open" => &close_prices,
+            "high" => &close_prices,
+            "low" => &close_prices,
+            "close" => &close_prices,
+            "volume" => &vec![1; total_candles]
+        )
+            .unwrap();
+
+        // Create BBands instance
+        let mut bbands = BBands::default();
+
+        // Process the entire dataset
+        bbands.process_graph(&candles).unwrap();
+        let full_graph = bbands.get_indicator_history().unwrap();
+
+        // Process the subset
+        let subset_candles = candles.tail(Some(subset_size));
+        let mut bbands_subset = BBands::default();
+        bbands_subset.process_graph(&subset_candles).unwrap();
+        let subset_graph = bbands_subset.get_indicator_history().unwrap();
+
+        // Compare the last row of the full graph with the last row of the subset graph
+        let full_last_row = full_graph.tail(Some(1));
+        let subset_last_row = subset_graph.tail(Some(1));
+
+        assert_eq!(
+            full_last_row.column("time").unwrap(),
+            subset_last_row.column("time").unwrap(),
+            "Time columns do not match"
+        );
+
+        let columns = ["lower", "middle", "upper"];
+        for col in columns.iter() {
+            let full_val = full_last_row.column(col).unwrap().f64().unwrap().get(0).unwrap();
+            let subset_val = subset_last_row.column(col).unwrap().f64().unwrap().get(0).unwrap();
+            assert!(
+                (full_val - subset_val).abs() < 1e-6,
+                "Column '{}' values do not match. Full: {}, Subset: {}",
+                col,
+                full_val,
+                subset_val
+            );
+        }
+
+        for col in columns.iter() {
+            let full_val = full_last_row.column(col).unwrap().f64().unwrap().get(0).unwrap();
+            let updated_val = subset_last_row.column(col).unwrap().f64().unwrap().get(0).unwrap();
+            assert!(
+                (full_val - updated_val).abs() < 1e-6,
+                "Column '{}' values do not match after updating with new candle. Full: {}, Updated: {}",
+                col,
+                full_val,
+                updated_val
+            );
+        }
     }
 }
