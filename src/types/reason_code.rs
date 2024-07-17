@@ -1,4 +1,3 @@
-
 /// Abstracts reasons for trades being reject or denied
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum ReasonCode {

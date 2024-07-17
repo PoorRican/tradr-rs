@@ -1,8 +1,63 @@
+/// This module contains traits for calculating indicator data from signals and determining
+/// signal data from that calculated data. Additionally, implementations of these traits
+/// are provided for specific indicators.
+///
+/// For each indicator implementation, there are two main traits that are implemented:
+/// 1. [`IndicatorGraphHandler`] - This trait is used to calculate the indicator data from the candle data.
+/// 2. [`IndicatorSignalHandler`] - This trait is used to calculate the signal data from the indicator data.
+///
+/// While these traits are inherently interlinked, they've been coded separately to allow for
+/// more flexibility in the future, and easier testing. The [`Indicator`] trait is a combination of
+/// the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended as the primary interface
+/// for processing candle data.
+///
+/// For all three traits, there are two main interfaces for processing candle data:
+/// 1. All candle data is processed at once, and the output is stored in a time-series DataFrame. This
+///     is intended for bootstrapping historical candle data and for backtesting.
+/// 2. A new candle row is processed, and the output is appended to the existing time-series DataFrame.
+///     This is intended for processing new candle data as it is received.
+///
+/// # Notes
+/// Due to the nature of candle data as it is received, there is no sorting that is performed internally.
 mod bbands;
 
-use chrono::NaiveDateTime;
-use polars::prelude::{DataFrame, DataFrameJoinOps, JoinArgs, JoinType};
+// Re-exports
+pub use bbands::BBands;
 
+use crate::types::Signal;
+use polars::prelude::*;
+
+#[derive(Debug)]
+pub enum SignalExtractionError {
+    InvalidSeriesLength,
+    InvalidGraphColumns,
+    IndicesNotAligned,
+    InvalidDataType,
+    CandlesEmpty,
+}
+
+#[derive(Debug)]
+pub enum SignalProcessingError {
+    GraphHistoryMissing,
+    GraphHistoryBehindCandles,
+    DuplicatedCandleTimestamps,
+    GraphIndexNotAlignedWithCandles,
+    ExtractionError(SignalExtractionError),
+}
+
+#[derive(Debug)]
+pub enum GraphProcessingError {
+    InvalidGraphColumns,
+    InvalidGraphLength,
+    CandlesEmpty,
+    DataFrameError(PolarsError),
+}
+
+#[derive(Debug)]
+pub enum IndicatorProcessingError {
+    GraphError(GraphProcessingError),
+    SignalError(SignalProcessingError),
+}
 
 /// Internal functions for indicators
 ///
@@ -11,18 +66,11 @@ use polars::prelude::{DataFrame, DataFrameJoinOps, JoinArgs, JoinType};
 ///
 /// This interface should not be exposed to higher-level code.
 trait IndicatorUtilities {
-    type Output;
-
     /// Reset the indicator
     ///
     /// This is used to reset the indicator to its initial state since indicator functions used by
     /// the TA library are stateful.
     fn restart_indicator(&mut self);
-
-    /// Convert the indicator output to a DataFrame
-    ///
-    /// This is used to convert the indicator output to a DataFrame with a single row.
-    fn convert_output_to_dataframe(&self, output: Self::Output, timestamp: NaiveDateTime) -> DataFrame;
 }
 
 /// This trait processes the candle data using the indicator function, then the output (the "graph")
@@ -31,138 +79,170 @@ trait IndicatorUtilities {
 /// There are main interfaces for processing the candle data:
 /// 1. All candle data is processed at once, and the entire output is stored in a time-series DataFrame
 /// 2. A new candle row is processed, and the output is appended to the time-series DataFrame
-pub trait IndicatorGraphHandler: IndicatorUtilities {
-    /// Process indicator data for all candle data
+trait IndicatorGraphHandler: IndicatorUtilities {
+    /// Process indicator data and overwrite existing data
     ///
-    /// This is called to "bootstrap" the indicator data. It is called once at the beginning of the
-    /// runtime.
-    ///
-    /// Any old indicator data is cleared.
+    /// This is meant to "bootstrap" the internal indicator graph with historical data.
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with the candle data
-    fn process_existing_candles(&mut self, candles: &DataFrame);
+    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError>;
 
     /// Update processed indicator data with new candle data rows
     ///
-    /// Internally, `extract_new_rows()` is called to get the new candle data, then the new candle data is
-    /// processed and appended to the time-series DataFrame
-    ///
     /// # Arguments
-    /// * `candles` - The DataFrame with the candle data. Must contain one new row.
+    /// * `candles` - New candle data. Should be larger than the window and must contain new data.
     ///
     /// # Panics
-    /// * If the DataFrame does not contain exactly one new row
-    fn process_new_candles(&mut self, candles: &DataFrame);
+    /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
+    fn process_graph_for_new_candles(
+        &mut self,
+        candles: &DataFrame,
+    ) -> Result<(), GraphProcessingError>;
 
     /// Get the entirety of the calculated indicator data
     ///
     /// # Returns
     /// A reference to the internal indicator graph
-    fn get_indicator_history(&self) -> &Option<DataFrame>;
+    fn get_indicator_history(&self) -> Option<&DataFrame>;
 }
 
-
-pub trait IndicatorSignalHandler: IndicatorGraphHandler {
-    /// Process signal data for all candle data
+trait IndicatorSignalHandler: IndicatorGraphHandler {
+    /// Process signal data and overwrite existing data
     ///
-    /// This is called to "bootstrap" the signal data, meant to be called once at the beginning of the
-    /// runtime.
-    ///
-    /// Any old signal data is cleared.
+    /// This is meant to "bootstrap" the internal indicator graph with historical data.
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with candle data. This is used to determine the signal.
-    fn process_existing_data(&mut self, candles: &DataFrame);
+    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError>;
 
     /// Update processed signal data with a new indicator graph row
     ///
-    /// Internally, `extract_new_rows()` is called to get the new indicator graph row, then the row is
-    /// processed and appended to the time-series DataFrame
-    ///
     /// # Arguments
-    /// * `candles` - The DataFrame with the candle data and is used to determine the signal.
+    /// * `candles` - New candle data. Should be larger than the window and must contain new data.
     ///
     /// # Panics
-    /// * If the DataFrame does not contain exactly one new row
-    fn process_new_data(&mut self, candles: &DataFrame);
+    /// * If the [`DataFrame`] only contains one new row, or does not contain new data.
+    fn process_signals_for_new_candles(
+        &mut self,
+        candles: &DataFrame,
+    ) -> Result<(), SignalProcessingError>;
 
     /// Get the entirety of the calculated signal data
     ///
     /// # Returns
     /// A reference to the internal signal data dataframe
-    fn get_signal_history(&self) -> &Option<DataFrame>;
+    fn get_signal_history(&self) -> Option<&DataFrame>;
 
+    fn extract_signals(
+        &self,
+        graph: &DataFrame,
+        candles: &DataFrame,
+    ) -> Result<DataFrame, SignalExtractionError>;
 }
 
-
-/// Extract new rows from a time-series DataFrame
+/// This trait combines the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended
+/// as the primary interface exposed for processing candle data.
 ///
-/// This performs an anti-join between two columns along the "time" column. The result is a DataFrame
-/// with the rows that are in the `updated` DataFrame but not in the `data` DataFrame.
+/// # Sequence of Operations
 ///
-/// This function is used when extracting new candle data that has not been processed by the indicator,
-/// and indicator data that has not been processed for signals.
+/// For normal runtime, the sequence of operations is as follows:
+/// 1. [`Indicator::process_existing()`] is called to process historical candle data at the beginning of the runtime.
+/// 2. [`Indicator::process_new()`] is called to process new candle data as it is received from the market.
+/// 3. [`Indicator::get_last_signal()`] is called to determine whether to attempt a trade.
 ///
-/// # Arguments
-/// * `updated` - The DataFrame with the new rows
-/// * `data` - The DataFrame with the old rows
-///
-/// # Returns
-/// A DataFrame with the new rows from `updated`
-fn extract_new_rows(updated: &DataFrame, data: &DataFrame) -> DataFrame {
-    // perform an anti-join to get the new rows
-    updated.join(data, ["time"], ["time"], JoinArgs::new(JoinType::Anti)).unwrap()
-}
+/// For backtesting, the sequence of operations is as follows:
+/// 1. [`Indicator::process_existing()`] is called to process historical candle data.
+/// 2. [`Indicator::get_signals()`] is called to get all the processed signal history.
+pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
+    fn get_name(&self) -> &'static str;
 
-#[cfg(test)]
-mod tests {
-    use polars::prelude::*;
-    use crate::indicators::extract_new_rows;
+    /// Process existing candle data
+    ///
+    /// This is the main interface for processing existing candle data. It is meant to be called once
+    /// at the beginning of the runtime for bootstrapping historical data, or for backtesting.
+    ///
+    /// # Arguments
+    /// * `candles` - Historical candle data
+    fn process_existing(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
+        match self.process_graph(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
+        };
 
-    /// Test that extract_new_rows() returns the correct rows
-    #[test]
-    fn test_extract_new_rows() {
-        let candles = df!(
-            "time" => &[1, 2, 3, 41, 51],
-            "open" => &[1, 2, 3, 42, 52],
-            "high" => &[1, 2, 3, 43, 53],
-            "low" => &[1, 2, 3, 44, 54],
-            "close" => &[1, 2, 3, 45, 55],
-            "volume" => &[1, 2, 3, 46, 56],
-        ).unwrap();
+        match self.process_signals(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
+        }
 
-        let indicator_data = df!(
-            "time" => &[1, 2, 3],
-            "open" => &[1, 2, 3],
-            "high" => &[1, 2, 3],
-            "low" => &[1, 2, 3],
-            "close" => &[1, 2, 3],
-            "volume" => &[1, 2, 3],
-        ).unwrap();
+        Ok(())
+    }
 
-        let new_rows = extract_new_rows(&candles, &indicator_data);
+    /// Process new candle data
+    ///
+    /// This is the main interface for processing new candle data. It is meant to be called with
+    /// new candle data as it is received from the market.
+    ///
+    /// # Arguments
+    /// * `candles` - New candle data. Should be larger than processing window.
+    ///
+    /// # Panics
+    /// * If the DataFrame does not contain more than one row
+    fn process_new(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
+        assert!(
+            candles.height() > 1,
+            "DataFrame must contain more than one row"
+        );
 
-        assert_eq!(new_rows.shape(), (2, 6));
+        match self.process_graph(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
+        };
 
-        // check time column
-        assert_eq!(new_rows.column("time").unwrap().i32().unwrap().get(0), Some(41));
-        assert_eq!(new_rows.column("time").unwrap().i32().unwrap().get(1), Some(51));
+        match self.process_signals(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
+        }
 
-        // check open column
-        assert_eq!(new_rows.column("open").unwrap().i32().unwrap().get(0), Some(42));
-        assert_eq!(new_rows.column("open").unwrap().i32().unwrap().get(1), Some(52));
+        Ok(())
+    }
 
-        assert_eq!(new_rows.column("high").unwrap().i32().unwrap().get(0), Some(43));
-        assert_eq!(new_rows.column("high").unwrap().i32().unwrap().get(1), Some(53));
+    /// Get the last signal
+    ///
+    /// Sort is not internally guaranteed.
+    ///
+    /// # Returns
+    /// * `Some` - The last signal in the signal history
+    /// * `None` - If there is no signal history
+    fn get_last_signal(&self) -> Option<Signal> {
+        if let Some(signal_history) = self.get_signal_history() {
+            let last_row = signal_history.tail(Some(1));
+            let signal_val = last_row
+                .column("signal")
+                .unwrap()
+                .i8()
+                .unwrap()
+                .get(0)
+                .unwrap();
+            Some(Signal::from(signal_val))
+        } else {
+            None
+        }
+    }
 
-        assert_eq!(new_rows.column("low").unwrap().i32().unwrap().get(0), Some(44));
-        assert_eq!(new_rows.column("low").unwrap().i32().unwrap().get(1), Some(54));
+    /// Get signal history
+    ///
+    /// Exposes internal signal history for debugging or backtesting purposes.
+    ///
+    /// # Returns
+    /// * `Some` - The raw signal history. This is a time-series [`DataFrame`] with the columns "time" and "signal".
+    ///     Values for "signal" are not converted to the [`Signal`] enum.
+    /// * `None` - If there is no signal history
+    fn get_signals(&self) -> Option<&DataFrame> {
+        self.get_signal_history()
+    }
 
-        assert_eq!(new_rows.column("close").unwrap().i32().unwrap().get(0), Some(45));
-        assert_eq!(new_rows.column("close").unwrap().i32().unwrap().get(1), Some(55));
-
-        assert_eq!(new_rows.column("volume").unwrap().i32().unwrap().get(0), Some(46));
-        assert_eq!(new_rows.column("volume").unwrap().i32().unwrap().get(1), Some(56));
+    fn get_graph(&self) -> Option<&DataFrame> {
+        self.get_indicator_history()
     }
 }

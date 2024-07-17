@@ -1,15 +1,48 @@
-mod fee;
 mod coinbase;
+mod fee;
+pub mod manager;
 
 use async_trait::async_trait;
-pub use fee::{SimplePercentageFee, FeeCalculator};
+
 pub use coinbase::CoinbaseClient;
+
+pub use fee::{FeeCalculator, SimplePercentageFee};
 
 use crate::types::{Candle, ExecutedTrade, FutureTrade};
 
+/// A minimum interface for interacting with cryptocurrency exchanges.
+///
+/// This interface defines methods for getting candles and submitting orders to the exchange.
+#[async_trait]
+pub trait BaseMarket: Clone {
+    /// Returns the name of the exchange.
+    fn name(&self) -> &str;
+
+    /// Returns a list of candles for the given trading pair and interval.
+    ///
+    /// # Arguments
+    /// * `pair` - The trading pair to get candles for. This is market specific.
+    /// * `interval` - The interval to get candles for. This is market specific.
+    async fn get_candles(&self, pair: &str, interval: &str) -> Result<Vec<Candle>, reqwest::Error>;
+
+    /// Submits an order to the exchange and returns the executed trade.
+    ///
+    /// # Arguments
+    /// * `order` - A proposed order to submit to the exchange.
+    /// * `product_id` - The product id to submit the order for. This is market specific.
+    ///
+    /// # Returns
+    /// * `ExecutedTrade` - The executed trade returned by the exchange if the order was filled.
+    async fn submit_order(
+        &self,
+        order: FutureTrade,
+        product_id: String,
+    ) -> Result<ExecutedTrade, reqwest::Error>;
+}
+
 /// A common interface for interacting with cryptocurrency exchanges.
 #[async_trait]
-pub trait Market {
+pub trait Market: BaseMarket {
     /// The type of trading pair info returned by the exchange.
     ///
     /// This is used when getting the trading pair info from the exchange and not directly
@@ -26,17 +59,4 @@ pub trait Market {
 
     /// Returns a list of trading pairs and their info supported by the exchange.
     async fn get_trading_pair_info(&self) -> Result<Vec<Self::PairType>, reqwest::Error>;
-
-    /// Returns a list of candles for the given trading pair and interval.
-    ///
-    /// # Arguments
-    /// * `pair` - The trading pair to get candles for. This is market specific.
-    /// * `interval` - The interval to get candles for. This is market specific.
-    async fn get_candles(&self,
-                   pair: &str,
-                   interval: &str,
-    ) -> Result<Vec<Candle>, reqwest::Error>;
-
-    /// Submits an order to the exchange and returns the executed trade.
-    async fn submit_order(&self, order: FutureTrade, product_id: String) -> Result<ExecutedTrade, reqwest::Error>;
 }

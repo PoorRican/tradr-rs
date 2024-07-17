@@ -1,9 +1,9 @@
-use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
-use polars::prelude::*;
 use crate::portfolio::Portfolio;
 use crate::types::Side;
 use crate::types::{ExecutedTrade, Trade};
+use chrono::NaiveDateTime;
+use polars::frame::DataFrame;
+use polars::prelude::*;
 
 pub trait PositionHandlers {
     fn add_open_position(&mut self, trade: &ExecutedTrade);
@@ -44,16 +44,21 @@ impl PositionHandlers for Portfolio {
         }
 
         // create a mask for all rows in `executed_trades` who's timestamps occur in `open_positions`
-        let mask = self.executed_trades
-            .column("point").unwrap()
-            .datetime().unwrap()
+        let mask = self
+            .executed_trades
+            .column("point")
+            .unwrap()
+            .datetime()
+            .unwrap()
             .into_iter()
-            .map(|x|
+            .map(|x| {
                 if let Some(t) = x {
-                    self.open_positions.contains(&NaiveDateTime::from_timestamp_millis(t).unwrap())
+                    self.open_positions
+                        .contains(&NaiveDateTime::from_timestamp_millis(t).unwrap())
                 } else {
                     false
-                })
+                }
+            })
             .collect();
         if let Ok(val) = self.executed_trades.filter(&mask) {
             Some(val)
@@ -80,12 +85,15 @@ impl PositionHandlers for Portfolio {
 
         // create a mask for all rows in `open_positions` who's price is lte `price`
         let open_positions = self.get_open_positions().unwrap();
-        let mask = open_positions.column("price").unwrap()
-            .f64().unwrap()
+        let mask = open_positions
+            .column("price")
+            .unwrap()
+            .f64()
+            .unwrap()
             .lt_eq(price);
         if let Ok(df) = open_positions.filter(&mask) {
             if df.height() > 0 {
-                return Some(df)
+                return Some(df);
             }
         }
         None
@@ -123,14 +131,17 @@ impl PositionHandlers for Portfolio {
         if let Some(open_positions) = open_positions {
             // get the timestamps of the open positions
             let open_positions_points = open_positions
-                .column("point").unwrap()
-                .datetime().unwrap()
+                .column("point")
+                .unwrap()
+                .datetime()
+                .unwrap()
                 .into_iter()
                 .map(|x| NaiveDateTime::from_timestamp_millis(x.unwrap()).unwrap())
                 .collect::<Vec<NaiveDateTime>>();
 
             // remove the timestamps of the open positions that were closed by the executed trade
-            self.open_positions = self.open_positions
+            self.open_positions = self
+                .open_positions
                 .iter()
                 .filter(|x| !open_positions_points.contains(x))
                 .map(|x| *x)
@@ -139,17 +150,11 @@ impl PositionHandlers for Portfolio {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::portfolio::{Portfolio, PositionHandlers, TradeHandlers};
+    use crate::types::{ExecutedTrade, Side};
     use chrono::{Duration, NaiveDateTime, Utc};
-    use crate::portfolio::{
-        Portfolio, PositionHandlers, TradeHandlers
-    };
-    use crate::types::{
-        Side,
-        ExecutedTrade,
-    };
 
     /// Test that open positions are correctly added to the `open_positions` vector.
     /// Also ensure that closed positions are not added to the `open_positions` vector.
@@ -162,13 +167,7 @@ mod tests {
         assert!(portfolio.open_positions.is_empty());
 
         // add a buy and assert it is added to `open_positions`
-        let trade = ExecutedTrade::new_without_cost(
-            "id".to_string(),
-            Side::Buy,
-            1.0,
-            1.0,
-            time,
-        );
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 1.0, 1.0, time);
         portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 1);
 
@@ -185,13 +184,7 @@ mod tests {
 
         // add another buy and assert it is added to `open_positions`
         let time2 = time + Duration::minutes(2);
-        let trade = ExecutedTrade::new_without_cost(
-            "id".to_string(),
-            Side::Buy,
-            1.0,
-            1.0,
-            time2,
-        );
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 1.0, 1.0, time2);
         portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 2);
 
@@ -208,26 +201,20 @@ mod tests {
         // create some executed trades
         // only `trade` and `trade3` should be returned by `get_open_positions`
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::new_without_cost(
-            "id".to_string(),
-            Side::Buy,
-            1.0,
-            1.0,
-            time
-        );
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 1.0, 1.0, time);
         let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.5,
             0.9,
-            time + Duration::seconds(1)
+            time + Duration::seconds(1),
         );
         let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.7,
             1.5,
-            time + Duration::seconds(2)
+            time + Duration::seconds(2),
         );
 
         portfolio.add_executed_trade(trade);
@@ -241,10 +228,27 @@ mod tests {
         let expected_quantity_sum = 1.0 + 0.9 + 1.5;
 
         let open_positions = portfolio.get_open_positions().unwrap();
-        assert_eq!(open_positions.column("quantity").unwrap().sum::<f64>().unwrap(), expected_quantity_sum);
-        assert_eq!(open_positions.column("price").unwrap().sum::<f64>().unwrap(), expected_price_sum);
+        assert_eq!(
+            open_positions
+                .column("quantity")
+                .unwrap()
+                .sum::<f64>()
+                .unwrap(),
+            expected_quantity_sum
+        );
+        assert_eq!(
+            open_positions
+                .column("price")
+                .unwrap()
+                .sum::<f64>()
+                .unwrap(),
+            expected_price_sum
+        );
 
-        assert_eq!(open_positions.get_column_names(), &["id", "side", "price", "quantity", "cost", "point"]);
+        assert_eq!(
+            open_positions.get_column_names(),
+            &["id", "side", "price", "quantity", "cost", "point"]
+        );
     }
 
     #[test]
@@ -255,35 +259,35 @@ mod tests {
             Side::Buy,
             2.0,
             1.0,
-            time + Duration::seconds(1)
+            time + Duration::seconds(1),
         );
         let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.9,
             1.0,
-            time + Duration::seconds(2)
+            time + Duration::seconds(2),
         );
         let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.8,
             1.0,
-            time + Duration::seconds(3)
+            time + Duration::seconds(3),
         );
         let trade4 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.0,
             1.0,
-            time + Duration::seconds(4)
+            time + Duration::seconds(4),
         );
         let trade5 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             0.1,
             1.0,
-            time + Duration::seconds(5)
+            time + Duration::seconds(5),
         );
 
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
@@ -311,12 +315,26 @@ mod tests {
         let selected_open_positions = portfolio.select_open_positions(1.9).unwrap();
 
         assert_eq!(selected_open_positions.height(), 3);
-        assert_eq!(selected_open_positions.column("price").unwrap().sum::<f64>().unwrap(), 1.9 + 1.8 + 1.0);
-        assert_eq!(selected_open_positions.column("quantity").unwrap().sum::<f64>().unwrap(), 1.0 * 3.0);
+        assert_eq!(
+            selected_open_positions
+                .column("price")
+                .unwrap()
+                .sum::<f64>()
+                .unwrap(),
+            1.9 + 1.8 + 1.0
+        );
+        assert_eq!(
+            selected_open_positions
+                .column("quantity")
+                .unwrap()
+                .sum::<f64>()
+                .unwrap(),
+            1.0 * 3.0
+        );
     }
 
     #[test]
-    fn test_available_open_positions()  {
+    fn test_available_open_positions() {
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
 
         // assert that `available_open_positions` is maxed when there are no open positions
@@ -324,10 +342,14 @@ mod tests {
         assert_eq!(portfolio.available_open_positions(), 10);
 
         // assert that `available_open_positions` is correctly decremented when an open positions are added
-        portfolio.open_positions.push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
+        portfolio
+            .open_positions
+            .push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
         assert_eq!(portfolio.available_open_positions(), 9);
 
-        portfolio.open_positions.push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
+        portfolio
+            .open_positions
+            .push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
         assert_eq!(portfolio.available_open_positions(), 8);
 
         // assert that `available_open_positions` is 0 when `open_positions_limit` is reached
@@ -346,28 +368,28 @@ mod tests {
             Side::Buy,
             2.0,
             1.0,
-            time + Duration::seconds(1)
+            time + Duration::seconds(1),
         );
         let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.9,
             1.0,
-            time + Duration::seconds(2)
+            time + Duration::seconds(2),
         );
         let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.8,
             1.0,
-            time + Duration::seconds(3)
+            time + Duration::seconds(3),
         );
         let trade4 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
             1.0,
             1.0,
-            time + Duration::seconds(4)
+            time + Duration::seconds(4),
         );
 
         // add trades to `executed_trades`
@@ -384,7 +406,7 @@ mod tests {
             Side::Sell,
             1.0,
             1.0,
-            time + Duration::seconds(5)
+            time + Duration::seconds(5),
         );
         portfolio.clear_open_positions(&executed_trade);
         assert_eq!(portfolio.open_positions.len(), 3);
@@ -395,7 +417,7 @@ mod tests {
             Side::Sell,
             1.9,
             1.0,
-            time + Duration::seconds(5)
+            time + Duration::seconds(5),
         );
         portfolio.clear_open_positions(&executed_trade);
         assert_eq!(portfolio.open_positions.len(), 1);
@@ -407,7 +429,7 @@ mod tests {
             Side::Sell,
             2.0,
             1.0,
-            time + Duration::seconds(6)
+            time + Duration::seconds(6),
         );
         portfolio.clear_open_positions(&executed_trade);
         assert!(portfolio.open_positions.is_empty());

@@ -1,19 +1,20 @@
-mod tracked;
 mod assets;
 mod capital;
-mod trade;
-mod position;
 mod persistence;
+mod position;
+mod tracked;
+mod trade;
 
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
-pub use trade::TradeHandlers;
+pub use persistence::Persistence;
 pub use position::PositionHandlers;
+pub use trade::TradeHandlers;
 
-use chrono::{Duration, NaiveDateTime, Utc};
-use polars::prelude::DataFrame;
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
+use chrono::{Duration, NaiveDateTime, Utc};
+use polars::prelude::DataFrame;
 
 pub const DEFAULT_LIMIT: usize = 4;
 pub const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
@@ -39,10 +40,12 @@ pub struct Portfolio {
 
 impl Portfolio {
     pub fn new<T>(assets: f64, capital: f64, point: T) -> Portfolio
-    where T: Into<Option<NaiveDateTime>> {
-        let point = point.into()
-            .unwrap_or_else(
-                || NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
+    where
+        T: Into<Option<NaiveDateTime>>,
+    {
+        let point = point.into().unwrap_or_else(|| {
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+        });
 
         Portfolio {
             failed_trades: DataFrame::empty(),
@@ -54,7 +57,7 @@ impl Portfolio {
             capital_ts: TrackedValue::with_initial(capital, point),
             open_positions_limit: DEFAULT_LIMIT,
             timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
-            fee_calculator: None
+            fee_calculator: None,
         }
     }
 
@@ -75,13 +78,15 @@ impl Portfolio {
             capital_ts,
             open_positions_limit: DEFAULT_LIMIT,
             timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
-            fee_calculator: None
+            fee_calculator: None,
         }
     }
 
     /// Builder method for the `fee_calculator` field
     pub fn add_fee_calculator<T>(mut self, fee_calculator: T) -> Self
-    where T: FeeCalculator + 'static {
+    where
+        T: FeeCalculator + 'static,
+    {
         self.fee_calculator = Some(Box::new(fee_calculator));
         self
     }
@@ -114,40 +119,27 @@ impl Portfolio {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::portfolio::{
-        assets::AssetHandlers,
-        capital::CapitalHandlers
-    };
-    use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode};
+    use crate::portfolio::{assets::AssetHandlers, capital::CapitalHandlers};
+    use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode, Side, Trade};
+    use std::collections::VecDeque;
 
     #[test]
     fn test_with_data() {
-        use chrono::NaiveDateTime;
         use crate::types::Side;
+        use chrono::NaiveDateTime;
 
         let assets = 100.0;
         let capital = 100.0;
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let mut portfolio = Portfolio::new(assets, capital, point);
-        let trade = FutureTrade::new(
-            Side::Buy,
-            100.0,
-            1.0,
-            point + Duration::seconds(1)
-        );
-        let executed_trade = ExecutedTrade::with_future_trade(
-            "id".to_string(),
-            trade.clone()
-        );
-        let failed_trade = FailedTrade::with_future_trade(
-            ReasonCode::MarketRejection,
-            trade.clone()
-        );
+        let trade = FutureTrade::new(Side::Buy, 100.0, 1.0, point + Duration::seconds(1));
+        let executed_trade = ExecutedTrade::with_future_trade("id".to_string(), trade.clone());
+        let failed_trade =
+            FailedTrade::with_future_trade(ReasonCode::MarketRejection, trade.clone());
 
         portfolio.add_executed_trade(executed_trade);
         portfolio.add_failed_trade(failed_trade);
@@ -157,7 +149,7 @@ mod tests {
             portfolio.executed_trades,
             portfolio.open_positions,
             portfolio.assets_ts,
-            portfolio.capital_ts
+            portfolio.capital_ts,
         );
 
         // assert that assets and capital `TrackedValues` were initialized correctly
@@ -167,7 +159,10 @@ mod tests {
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
         assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
-        assert_eq!(portfolio.timeout, Duration::minutes(DEFAULT_TIMEOUT_MINUTES));
+        assert_eq!(
+            portfolio.timeout,
+            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
+        );
 
         // assert that the trade storage is empty
         assert_eq!(portfolio.executed_trades.height(), 1);
@@ -192,7 +187,10 @@ mod tests {
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
         assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
-        assert_eq!(portfolio.timeout, Duration::minutes(DEFAULT_TIMEOUT_MINUTES));
+        assert_eq!(
+            portfolio.timeout,
+            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
+        );
 
         // assert that the trade storage is empty
         assert!(portfolio.failed_trades.is_empty());
@@ -231,9 +229,177 @@ mod tests {
     #[test]
     fn test_set_timeout() {
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
-        assert_eq!(portfolio.timeout, Duration::minutes(DEFAULT_TIMEOUT_MINUTES));
+        assert_eq!(
+            portfolio.timeout,
+            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
+        );
 
         portfolio.set_timeout(10);
         assert_eq!(portfolio.timeout, Duration::minutes(10));
+    }
+
+    /// Simulates a typical scenario in which a portfolio is created, and then
+    /// a series of trades are executed, some of which are profitable and some of which are not.
+    /// Check to make sure that the portfolio is updated appropriately.
+    #[test]
+    fn market_simulation() {
+        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap()
+            - Duration::seconds(1);
+
+        let mut portfolio = Portfolio::new(0.0, 300.0, time - Duration::seconds(1));
+        assert_eq!(portfolio.get_assets(), 0.0);
+        assert_eq!(portfolio.get_capital(), 300.0);
+
+        // this will be the sequences of prices used to simulate the market
+        let mut prices = VecDeque::from_iter(&[
+            100.0, // buy
+            99.0,  // buy
+            98.0,  // attempt sell
+            97.0,  // buy
+            98.0,  // sell
+            101.0, // sell
+        ]);
+
+        /*********************
+        handle the first buy
+        *********************/
+
+        // simulate a buy order
+        let price = prices.pop_front().unwrap();
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            Side::Buy,
+            *price,
+            1.0,
+            time + Duration::milliseconds(1),
+        );
+        portfolio.add_executed_trade(trade);
+
+        // assert that capital and assets have changed accordingly
+        assert_eq!(portfolio.get_assets(), 1.0);
+        assert_eq!(portfolio.get_capital(), 200.0);
+
+        // assert that trade storage, open positions, and available open positions have been updated
+        assert_eq!(portfolio.get_executed_trades().height(), 1);
+        assert_eq!(portfolio.get_open_positions().unwrap().height(), 1);
+        assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 1);
+
+        /**********************
+        handle the second buy
+        **********************/
+
+        // simulate another buy order at a lower price than the first
+        let price = prices.pop_front().unwrap();
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            Side::Buy,
+            *price,
+            1.0,
+            time + Duration::milliseconds(2),
+        );
+        portfolio.add_executed_trade(trade);
+
+        // assert that capital and assets have changed accordingly
+        assert_eq!(portfolio.get_assets(), 2.0);
+        assert_eq!(portfolio.get_capital(), 101.0);
+
+        // assert that trade storage, open positions, and available open positions have been updated
+        assert_eq!(portfolio.get_executed_trades().height(), 2);
+        assert_eq!(portfolio.get_open_positions().unwrap().height(), 2);
+        assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 2);
+
+        /*****************************
+        attempt an unprofitable sell
+        *****************************/
+
+        // attempt to generate a sell order using `is_rate_profitable` at a rate which is not profitable
+        let price = prices.pop_front().unwrap();
+        let potential_trade =
+            FutureTrade::new(Side::Sell, *price, 1.0, time + Duration::milliseconds(3));
+        let result = portfolio.is_rate_profitable(potential_trade.get_price());
+
+        // assert that there is no proposed trade
+        assert!(result.is_none());
+
+        // assert that capital and assets have not changed
+        assert_eq!(portfolio.get_assets(), 2.0);
+        assert_eq!(portfolio.get_capital(), 101.0);
+
+        // assert that trade storage, open positions, and available open positions have not been updated
+        assert_eq!(portfolio.get_executed_trades().height(), 2);
+        assert_eq!(portfolio.get_open_positions().unwrap().height(), 2);
+        assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 2);
+
+        /*********************
+        handle the third buy
+        *********************/
+
+        // simulate another buy order at a lower price than the second
+        let price = prices.pop_front().unwrap();
+        let trade = ExecutedTrade::new_without_cost(
+            "id".to_string(),
+            Side::Buy,
+            *price,
+            1.0,
+            time + Duration::milliseconds(4),
+        );
+        portfolio.add_executed_trade(trade);
+
+        // assert that capital and assets have changed accordingly
+        assert_eq!(portfolio.get_assets(), 3.0);
+        assert_eq!(portfolio.get_capital(), 4.0);
+
+        // assert that trade storage, open positions, and available open positions have been updated
+        assert_eq!(portfolio.get_executed_trades().height(), 3);
+        assert_eq!(portfolio.get_open_positions().unwrap().height(), 3);
+        assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 3);
+
+        /**************************
+        attempt a profitable sell
+        **************************/
+
+        // generate a sell order using `is_rate_profitable` at a rate which would sell the third buy order
+        let price = prices.pop_front().unwrap();
+        let potential_trade = portfolio.is_rate_profitable(*price).unwrap();
+
+        assert_eq!(potential_trade.get_side(), Side::Sell);
+        assert_eq!(potential_trade.get_price(), *price);
+        assert_eq!(potential_trade.get_quantity(), 1.0);
+
+        let trade = ExecutedTrade::with_future_trade("id".to_string(), potential_trade);
+        portfolio.add_executed_trade(trade);
+
+        // assert that capital and assets have changed accordingly
+        assert_eq!(portfolio.get_assets(), 2.0);
+        assert_eq!(portfolio.get_capital(), 102.0);
+
+        // assert that trade storage, open positions, and available open positions have been updated
+        assert_eq!(portfolio.get_executed_trades().height(), 4);
+        assert_eq!(portfolio.get_open_positions().unwrap().height(), 2);
+        assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT - 2);
+
+        /****************************
+        sell the rest of the assets
+        ****************************/
+
+        // simulate a sell order that will sell the first and second buy
+        let price = prices.pop_front().unwrap();
+        let potential_trade = portfolio.is_rate_profitable(*price).unwrap();
+
+        assert_eq!(potential_trade.get_side(), Side::Sell);
+        assert_eq!(potential_trade.get_price(), *price);
+        assert_eq!(potential_trade.get_quantity(), 2.0);
+
+        let trade = ExecutedTrade::with_future_trade("id".to_string(), potential_trade);
+        portfolio.add_executed_trade(trade);
+
+        // assert that capital and assets have changed accordingly
+        assert_eq!(portfolio.get_assets(), 0.0);
+        assert_eq!(portfolio.get_capital(), 304.0);
+
+        // assert that trade storage, open positions, and available open positions have been updated
+        assert_eq!(portfolio.get_executed_trades().height(), 5);
+        assert!(portfolio.get_open_positions().is_none());
+        assert_eq!(portfolio.available_open_positions(), DEFAULT_LIMIT);
     }
 }

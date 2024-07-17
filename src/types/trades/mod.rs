@@ -1,14 +1,14 @@
-mod future;
 mod executed;
 mod failed;
+mod future;
 
-pub use future::FutureTrade;
 pub use executed::ExecutedTrade;
 pub use failed::FailedTrade;
+pub use future::FutureTrade;
 
-use chrono::NaiveDateTime;
-use crate::types::signals::Side;
 use crate::traits::AsDataFrame;
+use crate::types::signals::Side;
+use chrono::NaiveDateTime;
 
 pub trait Trade: AsDataFrame {
     fn get_side(&self) -> Side;
@@ -21,7 +21,6 @@ pub trait Trade: AsDataFrame {
 
     fn get_point(&self) -> &NaiveDateTime;
 }
-
 
 // TODO: truncate (floor) to 2 decimal places
 pub fn calc_cost(price: f64, quantity: f64) -> f64 {
