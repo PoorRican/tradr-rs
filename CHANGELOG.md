@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.2.1
+
+- Add `Err` return values to `BBands.process_graph_for_new_candles()`
+
+---
+
 ## v0.2.0
 
 This release adds significant performance to `BBands`, and changes the API for `Strategy` and `Indicator` in preparation for a backtesting implementation.

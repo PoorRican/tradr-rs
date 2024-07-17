@@ -103,23 +103,20 @@ impl IndicatorGraphHandler for BBands {
         &mut self,
         candles: &DataFrame,
     ) -> Result<(), GraphProcessingError> {
-        // TODO: check that height is greater than window/period
-        assert_ne!(
-            candles.height(),
-            1,
-            "Dataframe must contain more than one row."
-        );
+        if candles.height() < self.period {
+            return Err(GraphProcessingError::InsufficientCandleData);
+        }
 
         // Ensure candles include new data
         let extracted = extract_new_rows(candles, self.graph.as_ref().unwrap());
-        assert_eq!(extracted.height(), 1, "Dataframe does not have new data.");
+        if extracted.height() == 0 {
+            return Ok(());
+        }
 
         // check validity of row
-        assert_eq!(
-            candles.get_column_names(),
-            ["time", "open", "high", "low", "close", "volume"],
-            "Row has incorrect column names"
-        );
+        if candles.get_column_names() != ["time", "open", "high", "low", "close", "volume"] {
+            return Err(GraphProcessingError::InvalidCandleColumns);
+        }
 
         // recalculate bollinger bands for a limited subset
         let last = candles.tail(Some(self.period));

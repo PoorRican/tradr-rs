@@ -47,10 +47,11 @@ pub enum SignalProcessingError {
 
 #[derive(Debug)]
 pub enum GraphProcessingError {
-    InvalidGraphColumns,
+    InvalidCandleColumns,
     InvalidGraphLength,
     CandlesEmpty,
     DataFrameError(PolarsError),
+    InsufficientCandleData,
 }
 
 #[derive(Debug)]
