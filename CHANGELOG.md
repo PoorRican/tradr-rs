@@ -6,3 +6,4 @@
 - Add `get_name` method to `Indicator` trait
 - Convert `BBands.signals` to use `i8` instead of `i32` for signal type
 - Change `Strategy.get_all_signals` to return a `DataFrame` instead of a `Vec<DataFrame>`
+- In `BBands`, alter `calculate_signals` to accept 2 `DataFrame` objects

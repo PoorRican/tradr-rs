@@ -57,7 +57,7 @@ trait IndicatorGraphHandler: IndicatorUtilities {
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with the candle data
-    fn process_graph_for_existing(&mut self, candles: &DataFrame);
+    fn process_graph_for_existing(&mut self, candles: &DataFrame) -> Result<(), ()>;
 
     /// Update processed indicator data with new candle data rows
     ///
@@ -85,7 +85,7 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
     ///
     /// # Arguments
     /// * `candles` - The DataFrame with candle data. This is used to determine the signal.
-    fn process_signals_for_existing(&mut self, candles: &DataFrame);
+    fn process_signals_for_existing(&mut self, candles: &DataFrame) -> Result<(), ()>;
 
     /// Update processed signal data with a new indicator graph row
     ///
@@ -126,9 +126,22 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     ///
     /// # Arguments
     /// * `candles` - Historical candle data
-    fn process_existing(&mut self, candles: &DataFrame) {
-        self.process_graph_for_existing(candles);
-        self.process_signals_for_existing(candles);
+    fn process_existing(&mut self, candles: &DataFrame) -> Result<(), ()> {
+        match self.process_graph_for_existing(candles) {
+            Ok(_) => {},
+            Err(_) => {
+                todo!()
+            }
+        };
+
+        match self.process_signals_for_existing(candles) {
+            Ok(_) => {},
+            Err(_) => {
+                todo!()
+            }
+        }
+
+        Ok(())
     }
 
     /// Process new candle data
@@ -184,5 +197,9 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     /// * `None` - If there is no signal history
     fn get_signals(&self) -> Option<&DataFrame> {
         self.get_signal_history()
+    }
+
+    fn get_graph(&self) -> Option<&DataFrame> {
+        self.get_indicator_history()
     }
 }
