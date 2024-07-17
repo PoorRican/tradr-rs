@@ -154,7 +154,7 @@ impl IndicatorSignalHandler for BBands {
                     return Err(SignalProcessingError::GraphIndexNotAlignedWithCandles)
                 }
 
-                match calculate_signal(history, candles, DEFAULT_THRESHOLD) {
+                match self.extract_signals(history, candles) {
                     Ok(signals) => {
                         self.signals = Some(signals);
                         Ok(())
@@ -200,9 +200,7 @@ impl IndicatorSignalHandler for BBands {
             return Err(SignalProcessingError::GraphIndexNotAlignedWithCandles);
         }
 
-        let new_signals = calculate_signal(
-            &new_graph_rows, &new_candle_rows, DEFAULT_THRESHOLD
-        ).unwrap();
+        let new_signals = self.extract_signals(&new_graph_rows, &new_candle_rows).unwrap();
 
         if let Some(ref mut signals) = self.signals {
             *signals = signals.vstack(&new_signals).unwrap();
@@ -216,6 +214,78 @@ impl IndicatorSignalHandler for BBands {
     fn get_signal_history(&self) -> Option<&DataFrame> {
         self.signals.as_ref()
     }
+
+    /// Calculate signal from indicator graph and candle data
+    ///
+    /// This function uses a threshold to determine where the close price is relative to the bounds of the
+    /// Bollinger Bands.
+    ///
+    /// # Arguments
+    /// * `graph` - A subset of the indicator graph
+    /// * `candles` - Candle data
+    ///
+    /// # Returns
+    /// A DataFrame with time and signals columns
+    fn extract_signals(&self, graph: &DataFrame, candles: &DataFrame) -> Result<DataFrame, SignalExtractionError> {
+        if graph.shape().1 != 4 {
+            return Err(SignalExtractionError::InvalidGraphColumns);
+        }
+
+        let lower = graph.column("lower").unwrap().f64().unwrap();
+        let middle = graph.column("middle").unwrap().f64().unwrap();
+        let upper = graph.column("upper").unwrap().f64().unwrap();
+
+        let candle_price = candles.column(DEFAULT_SOURCE_COL_NAME).unwrap().f64().unwrap().clone();
+
+        let buy_threshold = middle.clone() - (middle.clone() - lower.clone()) * self.threshold;
+        let sell_threshold = middle.clone() + (upper.clone() - middle.clone()) * self.threshold;
+
+        let index = candles.column("time").unwrap().clone();
+
+        // put all the data into a dataframe
+        let df = df![
+            "time" => index.clone(),
+            "buy_thresholds" => buy_threshold.into_series(),
+            "sell_thresholds" => sell_threshold.into_series(),
+            "candle_price" => candle_price.into_series()
+        ].unwrap();
+
+        // find where the thresholds are exceeded
+        let threshold_exceeded = df.lazy().select([
+            col("time"),
+            col("candle_price").lt_eq(col("buy_thresholds")).alias("buy_signals"),
+            col("candle_price").gt_eq(col("sell_thresholds")).alias("sell_signals"),
+        ]).collect().unwrap();
+
+        // combine the buy and sell signals into a single, numerical column
+        let signals = threshold_exceeded.lazy()
+            .with_column(when(col("sell_signals").eq(lit(true)))
+                .then(Signal::Sell as i8)
+                .otherwise(col("buy_signals").cast(DataType::Int8)).alias("trade_signals"))
+            .collect().unwrap();
+
+        // select only the time and trade_signals columns and cast the trade_signals column to an i8
+        let signals = signals.lazy()
+            .select([
+                col("time"),
+                col("trade_signals").cast(DataType::Int8)
+            ]).collect().unwrap();
+
+        // replace all null values with 0
+        let signals = signals.lazy()
+            .with_column(when(col("trade_signals").is_null())
+                .then(Signal::Hold as i8)
+                .otherwise(col("trade_signals")).alias("signals"));
+
+        // select only the time and signals columns
+        let signals = signals.lazy()
+            .select([
+                col("time"),
+                col("signals")
+            ]).collect().unwrap();
+
+        Ok(signals)
+    }
 }
 
 impl Indicator for BBands {
@@ -224,80 +294,6 @@ impl Indicator for BBands {
     }
 }
 
-
-/// Calculate signal from indicator and close price
-///
-/// This function uses a threshold to determine where the close price is relative to the bounds of the
-/// Bollinger Bands.
-///
-/// # Arguments
-/// * `graph` - The indicator graph
-/// * `candles` - Candles
-/// * `threshold` - The threshold to use when calculating the signal. This is expected to be a percentage.
-///     The higher the value, the more closely the candle price must be to the bounds of the Bollinger Bands
-///
-/// # Returns
-/// A `Signal` enum
-fn calculate_signal(graph: &DataFrame, candles: &DataFrame, threshold: f64) -> Result<DataFrame, SignalExtractionError> {
-    if graph.shape().1 != 4 {
-        return Err(SignalExtractionError::InvalidGraphColumns);
-    }
-
-    let lower = graph.column("lower").unwrap().f64().unwrap();
-    let middle = graph.column("middle").unwrap().f64().unwrap();
-    let upper = graph.column("upper").unwrap().f64().unwrap();
-
-    let candle_price = candles.column(DEFAULT_SOURCE_COL_NAME).unwrap().f64().unwrap().clone();
-
-    let buy_threshold = middle.clone() - (middle.clone() - lower.clone()) * threshold;
-    let sell_threshold = middle.clone() + (upper.clone() - middle.clone()) * threshold;
-
-    let index = candles.column("time").unwrap().clone();
-
-    // put all the data into a dataframe
-    let df = df![
-        "time" => index.clone(),
-        "buy_thresholds" => buy_threshold.into_series(),
-        "sell_thresholds" => sell_threshold.into_series(),
-        "candle_price" => candle_price.into_series()
-    ].unwrap();
-
-    // find where the thresholds are exceeded
-    let threshold_exceeded = df.lazy().select([
-        col("time"),
-        col("candle_price").lt_eq(col("buy_thresholds")).alias("buy_signals"),
-        col("candle_price").gt_eq(col("sell_thresholds")).alias("sell_signals"),
-    ]).collect().unwrap();
-
-    // combine the buy and sell signals into a single, numerical column
-    let signals = threshold_exceeded.lazy()
-        .with_column(when(col("sell_signals").eq(lit(true)))
-            .then(Signal::Sell as i8)
-            .otherwise(col("buy_signals").cast(DataType::Int8)).alias("trade_signals"))
-        .collect().unwrap();
-
-    // select only the time and trade_signals columns and cast the trade_signals column to an i8
-    let signals = signals.lazy()
-        .select([
-            col("time"),
-            col("trade_signals").cast(DataType::Int8)
-        ]).collect().unwrap();
-
-    // replace all null values with 0
-    let signals = signals.lazy()
-        .with_column(when(col("trade_signals").is_null())
-            .then(Signal::Hold as i8)
-            .otherwise(col("trade_signals")).alias("signals"));
-
-    // select only the time and signals columns
-    let signals = signals.lazy()
-        .select([
-            col("time"),
-            col("signals")
-        ]).collect().unwrap();
-
-    Ok(signals)
-}
 
 #[cfg(test)]
 mod tests {

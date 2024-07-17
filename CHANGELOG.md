@@ -14,3 +14,4 @@
 - Create errors for signal / graph processing
 - Add parameters to `BBands`
 - Refactor `calculate_bollinger_bands` as a private method of `BBands`
+- Refactor `calculate_signals` as a trait method of `IndicatorSignalHandlers`. Rename to `extract_signals`.

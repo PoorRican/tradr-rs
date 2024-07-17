@@ -127,6 +127,8 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
     /// # Returns
     /// A reference to the internal signal data dataframe
     fn get_signal_history(&self) -> Option<&DataFrame>;
+
+    fn extract_signals(&self, graph: &DataFrame, candles: &DataFrame) -> Result<DataFrame, SignalExtractionError>;
 }
 
 /// This trait combines the [`IndicatorGraphHandler`] and [`IndicatorSignalHandler`] traits and is intended
