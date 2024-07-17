@@ -12,3 +12,5 @@
 - Rename `IndicatorGraphHandler.process_graph_for_existing` to `process_graph`
 - Rename `IndicatorSignalHandler.process_signals_for_existing` to `process_signals`
 - Create errors for signal / graph processing
+- Add parameters to `BBands`
+- Refactor `calculate_bollinger_bands` as a private method of `BBands`

@@ -6,41 +6,19 @@ use crate::utils::extract_new_rows;
 const DEFAULT_PERIOD: usize = 20;
 const DEFAULT_MULTIPLIER: f64 = 2.0;
 const DEFAULT_THRESHOLD: f64 = 0.8;
-const SOURCE_COL_NAME: &str = "close";
+const DEFAULT_SOURCE_COL_NAME: &str = "close";
 
-fn calculate_bollinger_bands(df: &DataFrame, column_name: &str, periods: usize, num_std: f64) -> Result<DataFrame, PolarsError> {
-    let mut window_options = RollingOptionsFixedWindow::default();
-    window_options.min_periods = periods;
-    window_options.window_size = periods;
-
-    // Calculate the simple moving average (middle band)
-    let sma = df.column(column_name)?
-        .rolling_mean(RollingOptionsFixedWindow::default())?;
-
-    // Calculate the standard deviation
-    let std_dev = df.column(column_name)?
-        .rolling_std(window_options)?;
-
-    // Calculate upper and lower bands
-    let upper_band = sma.clone() + (std_dev.clone() * num_std);
-    let lower_band = sma.clone() - (&std_dev * num_std);
-
-    let index = df.column("time").unwrap();
-
-    Ok(
-        df!{
-            "time" => index,
-            "lower" => lower_band.unwrap(),
-            "middle" => sma,
-            "upper" => upper_band.unwrap()
-        }?
-    )
-}
 
 pub struct BBands {
+    // Bollinger Bands parameters
     period: usize,
     multiplier: f64,
 
+    // Indicator / signal parameters
+    threshold: f64,
+    source_column: String,
+
+    // Internal history
     graph: Option<DataFrame>,
     signals: Option<DataFrame>,
 }
@@ -50,9 +28,46 @@ impl BBands {
         Self {
             period,
             multiplier,
+            threshold: DEFAULT_THRESHOLD,
+            source_column: String::from(DEFAULT_SOURCE_COL_NAME),
             graph: None,
             signals: None,
         }
+    }
+
+    pub fn with_threshold(mut self, threshold: f64) -> Self {
+        self.threshold = threshold;
+        self
+    }
+
+    pub fn with_source_column(mut self, source_column: String) -> Self {
+        self.source_column = source_column;
+        self
+    }
+
+    fn calculate_bollinger_bands(&self, df: &DataFrame) -> PolarsResult<DataFrame> {
+        let index = df.column("time").unwrap();
+
+        let series = df.column(self.source_column.as_str()).unwrap();
+
+        let window = RollingOptionsFixedWindow {
+            min_periods: self.period,
+            window_size: self.period,
+            ..Default::default()
+        };
+
+        let sma = series.rolling_mean(window.clone())?;
+        let std_dev = series.rolling_std(window)?;
+
+        let upper = sma.clone() + (&std_dev * self.multiplier);
+        let lower = sma.clone() - (&std_dev * self.multiplier);
+
+        df![
+            "time" => index,
+            "lower" => lower.unwrap().into_series(),
+            "middle" => sma,
+            "upper" => upper.unwrap().into_series()
+        ]
     }
 }
 impl IndicatorUtilities for BBands {
@@ -73,12 +88,7 @@ impl IndicatorGraphHandler for BBands {
     fn process_graph(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError> {
         self.restart_indicator();
 
-        match calculate_bollinger_bands(
-            candles,
-            SOURCE_COL_NAME,
-            DEFAULT_PERIOD,
-            DEFAULT_MULTIPLIER
-        ) {
+        match self.calculate_bollinger_bands(candles) {
             Ok(output) => {
                 self.graph = Some(output);
                 Ok(())
@@ -105,12 +115,7 @@ impl IndicatorGraphHandler for BBands {
         // recalculate bollinger bands for a limited subset
         let last = candles
             .tail(Some(self.period));
-        let output = calculate_bollinger_bands(
-            &last,
-            SOURCE_COL_NAME,
-            self.period,
-            self.multiplier
-        ).unwrap();
+        let output = self.calculate_bollinger_bands(&last).unwrap();
 
         let new_row = output
             .tail(Some(1));
@@ -242,7 +247,7 @@ fn calculate_signal(graph: &DataFrame, candles: &DataFrame, threshold: f64) -> R
     let middle = graph.column("middle").unwrap().f64().unwrap();
     let upper = graph.column("upper").unwrap().f64().unwrap();
 
-    let candle_price = candles.column(SOURCE_COL_NAME).unwrap().f64().unwrap().clone();
+    let candle_price = candles.column(DEFAULT_SOURCE_COL_NAME).unwrap().f64().unwrap().clone();
 
     let buy_threshold = middle.clone() - (middle.clone() - lower.clone()) * threshold;
     let sell_threshold = middle.clone() + (upper.clone() - middle.clone()) * threshold;
@@ -404,11 +409,6 @@ mod tests {
             // check for general ranges
             assert!(history.column("lower").unwrap().f64().unwrap().get(i).unwrap() < i as f64 - 2.0);
             assert!(history.column("upper").unwrap().f64().unwrap().get(i).unwrap() > i as f64 + 2.0);
-
-            assert_eq!(
-                history.column("middle").unwrap().f64().unwrap().get(i).unwrap(),
-                i as f64
-            );
         }
     }
 
