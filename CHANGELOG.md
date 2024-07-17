@@ -1,5 +1,7 @@
 # v0.2.0
 
+This release adds significant performance to `BBands`, and changes the API for `Strategy` and `Indicator` in preparation for a backtesting implementation.
+
 - Create function for extracting candle data from db
 - Improve performance of `BBands` by implementing `polars` window functions. Functions are now required to be passed a subset of candle data instead of new rows.
 - Rename `Strategy.get_signals` to `Strategy.get_all_signals`
