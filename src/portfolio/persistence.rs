@@ -357,7 +357,7 @@ mod tests {
         let df: DataFrame = portfolio.assets_ts.clone().into();
         assert_eq!(df.height(), 2);
 
-        assert_eq!(portfolio.get_capital(), 0.0);
+        assert_eq!(portfolio.available_capital(), 0.0);
         let df: DataFrame = portfolio.capital_ts.clone().into();
         assert_eq!(df.height(), 2);
 

@@ -16,6 +16,7 @@
 - Add functions which propose `FutureTrades` - `generate_buy_opt()` and `generate_sell_opt()`
 - Mark `Portfolio.is_rate_profitable` as deprecated. Usage must be removed from `Engine`.
 - Add `PortfolioArgs` for `Portfolio` initialization
+- Rename `get_capital` to `available_capital` for better readability
 
 ### Indicator Improvements
 

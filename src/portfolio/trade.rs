@@ -137,7 +137,7 @@ impl TradeHandlers for Portfolio {
     ///
     /// This number is determined by the amount of capital available and the number of open positions.
     fn get_buy_cost(&self) -> f64 {
-        self.get_capital() / self.available_open_positions() as f64
+        self.available_capital() / self.available_open_positions() as f64
     }
 
     /// Get the most recent trade
@@ -250,7 +250,7 @@ mod tests {
             NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         assert!(portfolio.executed_trades.is_empty());
-        assert_eq!(portfolio.get_capital(), 200.0);
+        assert_eq!(portfolio.available_capital(), 200.0);
         assert_eq!(portfolio.get_assets(), 200.0);
 
         portfolio.add_executed_trade(trade);
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(portfolio.open_positions.len(), 1);
 
         // check that capital and assets are updated
-        assert_eq!(portfolio.get_capital(), 100.0);
+        assert_eq!(portfolio.available_capital(), 100.0);
         assert_eq!(portfolio.get_assets(), 201.0);
 
         // handle a sell
@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(portfolio.executed_trades.height(), 2);
 
         // check that capital and assets are updated
-        assert_eq!(portfolio.get_capital(), 200.0);
+        assert_eq!(portfolio.available_capital(), 200.0);
         assert_eq!(portfolio.get_assets(), 200.0);
         assert_eq!(portfolio.open_positions.len(), 0);
     }

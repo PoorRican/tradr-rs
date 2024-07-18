@@ -226,7 +226,7 @@ mod tests {
 
         // assert that assets and capital `TrackedValues` were initialized correctly
         assert_eq!(portfolio.get_assets(), assets + 1.0);
-        assert_eq!(portfolio.get_capital(), capital - 100.0);
+        assert_eq!(portfolio.available_capital(), capital - 100.0);
 
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
@@ -254,7 +254,7 @@ mod tests {
 
         // assert that assets and capital `TrackedValues` are initialized correctly
         assert_eq!(portfolio.get_assets(), assets);
-        assert_eq!(portfolio.get_capital(), capital);
+        assert_eq!(portfolio.available_capital(), capital);
 
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
@@ -320,7 +320,7 @@ mod tests {
 
         let mut portfolio = Portfolio::new(0.0, 300.0, time - Duration::seconds(1));
         assert_eq!(portfolio.get_assets(), 0.0);
-        assert_eq!(portfolio.get_capital(), 300.0);
+        assert_eq!(portfolio.available_capital(), 300.0);
 
         // this will be the sequences of prices used to simulate the market
         let mut prices = VecDeque::from_iter(&[
@@ -349,7 +349,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 1.0);
-        assert_eq!(portfolio.get_capital(), 200.0);
+        assert_eq!(portfolio.available_capital(), 200.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 1);
@@ -373,7 +373,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 2.0);
-        assert_eq!(portfolio.get_capital(), 101.0);
+        assert_eq!(portfolio.available_capital(), 101.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 2);
@@ -395,7 +395,7 @@ mod tests {
 
         // assert that capital and assets have not changed
         assert_eq!(portfolio.get_assets(), 2.0);
-        assert_eq!(portfolio.get_capital(), 101.0);
+        assert_eq!(portfolio.available_capital(), 101.0);
 
         // assert that trade storage, open positions, and available open positions have not been updated
         assert_eq!(portfolio.get_executed_trades().height(), 2);
@@ -419,7 +419,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 3.0);
-        assert_eq!(portfolio.get_capital(), 4.0);
+        assert_eq!(portfolio.available_capital(), 4.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 3);
@@ -443,7 +443,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 2.0);
-        assert_eq!(portfolio.get_capital(), 102.0);
+        assert_eq!(portfolio.available_capital(), 102.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 4);
@@ -467,7 +467,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 0.0);
-        assert_eq!(portfolio.get_capital(), 304.0);
+        assert_eq!(portfolio.available_capital(), 304.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 5);

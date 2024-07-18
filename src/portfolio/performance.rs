@@ -32,7 +32,7 @@ impl Portfolio {
     // TODO: bad implementation
     fn calculate_total_return(&self, df: &DataFrame) -> Result<f64, PolarsError> {
         let initial_capital = self.capital_ts.get_last_value();
-        let final_capital = self.get_capital();
+        let final_capital = self.available_capital();
         Ok((final_capital - initial_capital) / initial_capital)
     }
 
