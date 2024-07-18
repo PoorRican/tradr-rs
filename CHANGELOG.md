@@ -2,6 +2,10 @@
 
 ## v0.3.0
 
+### Code Changes
+
+- Remove `Engine`. This will be replaced with an updated implementation in the future.
+
 ---
 
 ## v0.2.1
