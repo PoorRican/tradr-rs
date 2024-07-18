@@ -18,6 +18,7 @@
 - Mark `Portfolio.is_rate_profitable` as deprecated. Usage must be removed from `Engine`.
 - Add `PortfolioArgs` for `Portfolio` initialization
 - Rename `get_capital` to `available_capital` for better readability
+- Remove `Persistence` module. This will be replaced with a database implementation in the future.
 
 ### Indicator Improvements
 

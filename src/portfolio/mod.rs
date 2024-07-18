@@ -1,6 +1,5 @@
 mod assets;
 mod capital;
-mod persistence;
 mod position;
 mod tracked;
 mod trade;
@@ -8,7 +7,6 @@ mod performance;
 
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
-pub use persistence::Persistence;
 pub use position::PositionHandlers;
 pub use trade::TradeHandlers;
 pub use performance::PerformanceMetrics;
