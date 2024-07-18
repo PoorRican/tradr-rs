@@ -1,7 +1,7 @@
 use chrono::{DateTime};
 use polars::prelude::*;
 
-use crate::portfolio::{PerformanceMetrics, Portfolio, TradeHandlers};
+use crate::portfolio::{PerformanceMetrics, Portfolio, PositionHandlers, TradeHandlers};
 use crate::strategies::Strategy;
 use crate::types::{ExecutedTrade, FutureTrade, Side};
 use crate::utils;
@@ -62,25 +62,8 @@ impl<'a> BacktestingRunner<'a> {
                 // trading logic
                 for (candle, side) in candles.iter().zip(sides.iter()) {
                     let trade = match side {
-                        Side::Buy => {
-                            if self.portfolio.able_to_buy() {
-                                // generate buy rate
-                                // TODO: create dedicated function function to calculate rate
-                                let buy_rate = ((candle.close * 2.0) + candle.high + candle.open) / 4.0;
-
-                                let cost = self.portfolio.get_buy_cost();
-
-                                Some(FutureTrade::new_from_cost(Side::Buy, buy_rate, cost,
-                                                                candle.time))
-                            } else {
-                                None
-                            }
-                        },
-                        Side::Sell => {
-                            // TODO: create dedicated function to calculate rate
-                            let sell_rate = ((candle.close * 2.0) + candle.low + candle.open) / 4.0;
-                            self.portfolio.is_rate_profitable(sell_rate)
-                        },
+                        Side::Buy => self.portfolio.generate_buy_opt(&candle),
+                        Side::Sell => self.portfolio.generate_sell_opt(&candle)
                     };
 
                     // attempt trades
@@ -90,6 +73,10 @@ impl<'a> BacktestingRunner<'a> {
                         self.portfolio.add_executed_trade(executed);
                     }
                 }
+
+                println!("Trades: {:?}", self.portfolio.get_executed_trades());
+
+                println!("Open Positions: {:?}", self.portfolio.get_open_positions().unwrap());
 
                 // arbitrarily using a 3% risk-free rate
                 Ok(self.portfolio.calculate_performance_metrics(0.03).unwrap())

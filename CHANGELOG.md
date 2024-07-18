@@ -13,6 +13,8 @@
 ### Portfolio Improvements
 
 - Add performance metrics to `Portfolio`
+- Add functions which propose `FutureTrades` - `generate_buy_opt()` and `generate_sell_opt()`
+- Mark `Portfolio.is_rate_profitable` as deprecated. Usage must be removed from `Engine`.
 
 ### Indicator Improvements
 
