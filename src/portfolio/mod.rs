@@ -1,15 +1,15 @@
 mod assets;
 mod capital;
-mod persistence;
 mod position;
 mod tracked;
 mod trade;
+mod performance;
 
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
-pub use persistence::Persistence;
 pub use position::PositionHandlers;
 pub use trade::TradeHandlers;
+pub use performance::PerformanceMetrics;
 
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
@@ -19,6 +19,61 @@ use polars::prelude::DataFrame;
 pub const DEFAULT_LIMIT: usize = 4;
 pub const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
 pub const DEFAULT_THRESHOLD: f64 = 0.50;
+
+/// Arguments for creating a new portfolio via the [`Portfolio::from_args`] constructor
+///
+/// This is used in backtesting to dynamically creating a [`Portfolio`] with the desired parameters when the
+/// start time (used for internal tracking) is not known.
+///
+/// # Examples
+///
+/// All configurable parameters are accessible via the fields of the struct.
+///
+/// ```
+/// use crate::portfolio::{PortfolioArgs, Portfolio};
+///
+/// let args = PortfolioArgs {
+///    assets: 0.0,
+///    capital: 100.0,
+///    threshold: 0.25,
+///    open_positions_limit: 2,
+///    timeout: 60 * 2,
+/// };
+///
+/// // create a new Portfolio using the `from_args` constructor
+/// let portfolio = Portfolio::from_args(&args, NaiveDateTime::from_timestamp(0, 0));
+/// ```
+///
+/// Any value that is not provided will default to the value specified in the [`Default`] implementation.
+/// ```
+/// use crate::portfolio::{PortfolioArgs, Portfolio};
+///
+/// let args = PortfolioArgs {
+///    assets: 0.0,
+///    capital: 100.0,
+///   ..Default::default()
+/// };
+///
+/// let portfolio = Portfolio::from_args(&args, NaiveDateTime::from_timestamp(0, 0));
+/// ```
+pub struct PortfolioArgs {
+    pub assets: f64,
+    pub capital: f64,
+    pub threshold: f64,
+    pub open_positions_limit: usize,
+    pub timeout: i64,
+}
+impl Default for PortfolioArgs {
+    fn default() -> Self {
+        PortfolioArgs {
+            assets: 0.0,
+            capital: 100.0,
+            threshold: DEFAULT_THRESHOLD,
+            open_positions_limit: DEFAULT_LIMIT,
+            timeout: DEFAULT_TIMEOUT_MINUTES,
+        }
+    }
+}
 
 /// This struct is used to manage an entire portfolio for a given asset.
 ///
@@ -57,6 +112,21 @@ impl Portfolio {
             capital_ts: TrackedValue::with_initial(capital, point),
             open_positions_limit: DEFAULT_LIMIT,
             timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
+            fee_calculator: None,
+        }
+    }
+
+    pub fn from_args(args: &PortfolioArgs, start_time: NaiveDateTime) -> Self {
+        Self {
+            failed_trades: DataFrame::empty(),
+            executed_trades: DataFrame::empty(),
+            open_positions: vec![],
+
+            threshold: args.threshold,
+            assets_ts: TrackedValue::with_initial(args.assets, start_time),
+            capital_ts: TrackedValue::with_initial(args.capital, start_time),
+            open_positions_limit: args.open_positions_limit,
+            timeout: Duration::minutes(args.timeout),
             fee_calculator: None,
         }
     }
@@ -154,7 +224,7 @@ mod tests {
 
         // assert that assets and capital `TrackedValues` were initialized correctly
         assert_eq!(portfolio.get_assets(), assets + 1.0);
-        assert_eq!(portfolio.get_capital(), capital - 100.0);
+        assert_eq!(portfolio.available_capital(), capital - 100.0);
 
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
@@ -182,7 +252,7 @@ mod tests {
 
         // assert that assets and capital `TrackedValues` are initialized correctly
         assert_eq!(portfolio.get_assets(), assets);
-        assert_eq!(portfolio.get_capital(), capital);
+        assert_eq!(portfolio.available_capital(), capital);
 
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
@@ -248,7 +318,7 @@ mod tests {
 
         let mut portfolio = Portfolio::new(0.0, 300.0, time - Duration::seconds(1));
         assert_eq!(portfolio.get_assets(), 0.0);
-        assert_eq!(portfolio.get_capital(), 300.0);
+        assert_eq!(portfolio.available_capital(), 300.0);
 
         // this will be the sequences of prices used to simulate the market
         let mut prices = VecDeque::from_iter(&[
@@ -277,7 +347,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 1.0);
-        assert_eq!(portfolio.get_capital(), 200.0);
+        assert_eq!(portfolio.available_capital(), 200.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 1);
@@ -301,7 +371,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 2.0);
-        assert_eq!(portfolio.get_capital(), 101.0);
+        assert_eq!(portfolio.available_capital(), 101.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 2);
@@ -323,7 +393,7 @@ mod tests {
 
         // assert that capital and assets have not changed
         assert_eq!(portfolio.get_assets(), 2.0);
-        assert_eq!(portfolio.get_capital(), 101.0);
+        assert_eq!(portfolio.available_capital(), 101.0);
 
         // assert that trade storage, open positions, and available open positions have not been updated
         assert_eq!(portfolio.get_executed_trades().height(), 2);
@@ -347,7 +417,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 3.0);
-        assert_eq!(portfolio.get_capital(), 4.0);
+        assert_eq!(portfolio.available_capital(), 4.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 3);
@@ -371,7 +441,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 2.0);
-        assert_eq!(portfolio.get_capital(), 102.0);
+        assert_eq!(portfolio.available_capital(), 102.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 4);
@@ -395,7 +465,7 @@ mod tests {
 
         // assert that capital and assets have changed accordingly
         assert_eq!(portfolio.get_assets(), 0.0);
-        assert_eq!(portfolio.get_capital(), 304.0);
+        assert_eq!(portfolio.available_capital(), 304.0);
 
         // assert that trade storage, open positions, and available open positions have been updated
         assert_eq!(portfolio.get_executed_trades().height(), 5);

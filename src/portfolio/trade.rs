@@ -3,7 +3,7 @@ use crate::portfolio::capital::CapitalHandlers;
 use crate::portfolio::position::PositionHandlers;
 use crate::portfolio::Portfolio;
 use crate::traits::AsDataFrame;
-use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, Side, Trade};
+use crate::types::{Candle, ExecutedTrade, FailedTrade, FutureTrade, Side, Trade};
 use chrono::{NaiveDateTime, Utc};
 use polars::prelude::DataFrame;
 
@@ -12,7 +12,10 @@ pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
     fn get_executed_trades(&self) -> &DataFrame;
     fn add_failed_trade(&mut self, trade: FailedTrade);
     fn add_executed_trade(&mut self, trade: ExecutedTrade);
+    #[deprecated(note="Use generate_sell_opt() instead")]
     fn is_rate_profitable(&self, rate: f64) -> Option<FutureTrade>;
+    fn generate_sell_opt(&self, candle: &Candle) -> Option<FutureTrade>;
+    fn generate_buy_opt(&self, candle: &Candle) -> Option<FutureTrade>;
     fn get_buy_cost(&self) -> f64;
     fn get_last_trade(&self) -> Option<ExecutedTrade>;
     fn able_to_buy(&self) -> bool;
@@ -74,6 +77,7 @@ impl TradeHandlers for Portfolio {
         if let Some(positions) = viable_positions {
             // the total quantity of assets to be sold
             let quantity: f64 = positions.column("quantity").unwrap().sum().unwrap();
+
             // the total cost at which the assets were purchased
             let cost: f64 = positions.column("cost").unwrap().sum().unwrap();
 
@@ -93,11 +97,47 @@ impl TradeHandlers for Portfolio {
         None
     }
 
+    fn generate_sell_opt(&self, candle: &Candle) -> Option<FutureTrade> {
+        let rate = calculate_sell_rate(candle);
+        let viable_positions = self.select_open_positions(rate);
+
+        if let Some(positions) = viable_positions {
+            // the total quantity of assets to be sold
+            let quantity: f64 = positions.column("quantity").unwrap().sum().unwrap();
+
+            // the total cost at which the assets were purchased
+            let cost: f64 = positions.column("cost").unwrap().sum().unwrap();
+
+            // calculate the value of the assets at the proposed rate
+            let sell_value = match self.fee_calculator {
+                Some(ref fee_calculator) => {
+                    fee_calculator.cost_including_fee(quantity * rate, Side::Sell)
+                }
+                None => quantity * rate,
+            };
+            let profit = sell_value - cost;
+            if profit > self.threshold {
+                return Some(FutureTrade::new(Side::Sell, rate, quantity, candle.time));
+            }
+        }
+        None
+    }
+
+    fn generate_buy_opt(&self, candle: &Candle) -> Option<FutureTrade> {
+        if !self.able_to_buy() {
+            return None
+        }
+        let rate = calculate_buy_rate(candle);
+        let cost = self.get_buy_cost();
+        Some(FutureTrade::new(Side::Buy, rate, cost, candle.time))
+    }
+
+
     /// The amount of capital to use for a single buy trade
     ///
     /// This number is determined by the amount of capital available and the number of open positions.
     fn get_buy_cost(&self) -> f64 {
-        self.get_capital() / self.available_open_positions() as f64
+        self.available_capital() / self.available_open_positions() as f64
     }
 
     /// Get the most recent trade
@@ -148,6 +188,14 @@ impl TradeHandlers for Portfolio {
             true
         }
     }
+}
+
+fn calculate_buy_rate(candle: &Candle) -> f64 {
+    ((candle.close * 2.0) + candle.high + candle.open) / 4.0
+}
+
+fn calculate_sell_rate(candle: &Candle) -> f64 {
+    ((candle.close * 2.0) + candle.low + candle.open) / 4.0
 }
 
 #[cfg(test)]
@@ -202,7 +250,7 @@ mod tests {
             NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap(),
         );
         assert!(portfolio.executed_trades.is_empty());
-        assert_eq!(portfolio.get_capital(), 200.0);
+        assert_eq!(portfolio.available_capital(), 200.0);
         assert_eq!(portfolio.get_assets(), 200.0);
 
         portfolio.add_executed_trade(trade);
@@ -210,7 +258,7 @@ mod tests {
         assert_eq!(portfolio.open_positions.len(), 1);
 
         // check that capital and assets are updated
-        assert_eq!(portfolio.get_capital(), 100.0);
+        assert_eq!(portfolio.available_capital(), 100.0);
         assert_eq!(portfolio.get_assets(), 201.0);
 
         // handle a sell
@@ -226,7 +274,7 @@ mod tests {
         assert_eq!(portfolio.executed_trades.height(), 2);
 
         // check that capital and assets are updated
-        assert_eq!(portfolio.get_capital(), 200.0);
+        assert_eq!(portfolio.available_capital(), 200.0);
         assert_eq!(portfolio.get_assets(), 200.0);
         assert_eq!(portfolio.open_positions.len(), 0);
     }

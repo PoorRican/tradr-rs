@@ -58,7 +58,7 @@ where
     /// or when the engine is first initialized.
     fn bootstrap(&mut self) {
         self.strategy
-            .bootstrap(self.manager.get(&self.current_interval).unwrap().clone());
+            .bootstrap(&self.manager.get(&self.current_interval).unwrap().clone());
     }
 
     /// Bootstrap the engine by fetching candles and bootstrapping the indicators

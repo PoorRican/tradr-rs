@@ -1,4 +1,4 @@
-use crate::types::Candle;
+use crate::types::{Candle, Side, Signal};
 use chrono::DateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{DataFrameJoinOps, JoinArgs, JoinType};
@@ -6,6 +6,7 @@ use sqlite::Connection;
 use std::env::temp_dir;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
+use polars::error::PolarsResult;
 
 /// create temp dir for testing
 pub fn create_temp_dir(dir: &Path) -> PathBuf {
@@ -69,6 +70,38 @@ pub fn extract_candles_from_db(db_path: &str, table_name: &str) -> Result<Vec<Ca
     Ok(results)
 }
 
+
+pub fn extract_candles_from_df(df: &DataFrame) -> PolarsResult<Vec<Candle>> {
+    let time = df.column("time")?.datetime()?;
+    let high = df.column("high")?.f64()?;
+    let low = df.column("low")?.f64()?;
+    let open = df.column("open")?.f64()?;
+    let close = df.column("close")?.f64()?;
+    let volume = df.column("volume")?.f64()?;
+
+    Ok((0..time.len())
+        .into_iter()
+        .map(
+        |i| {
+            Candle {
+                time: DateTime::from_timestamp_millis(time.get(i).unwrap()).unwrap().naive_utc(),
+                high: high.get(i).unwrap(),
+                low: low.get(i).unwrap(),
+                open: open.get(i).unwrap(),
+                close: close.get(i).unwrap(),
+                volume: volume.get(i).unwrap(),
+            }
+        },
+    ).collect())
+}
+
+pub fn extract_side_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<Vec<Side>> {
+    Ok(df.column(column_name)?.i8()?
+        .into_iter()
+        .map(|value| {
+            Side::from(value.unwrap())
+        }).collect())
+}
 #[cfg(test)]
 mod tests {
     use crate::utils::extract_new_rows;

@@ -51,6 +51,15 @@ pub enum Side {
     Buy = BUY,
 }
 
+impl Into<i8> for Side {
+    fn into(self) -> i8 {
+        match self {
+            Side::Buy => BUY as i8,
+            Side::Sell => SELL as i8,
+        }
+    }
+}
+
 impl TryFrom<Signal> for Side {
     type Error = &'static str;
 
