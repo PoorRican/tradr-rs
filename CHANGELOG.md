@@ -6,6 +6,10 @@
 
 - Remove `Engine`. This will be replaced with an updated implementation in the future.
 
+### Portfolio Improvements
+
+- Remove all internal of `DataFrame`. Instead, `Vec` and `HashMap` are used to store data.
+
 ---
 
 ## v0.2.1

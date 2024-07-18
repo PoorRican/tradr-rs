@@ -27,6 +27,14 @@ where
 #[derive(Clone, Debug)]
 pub struct TrackedValue(DataFrame);
 
+impl Default for TrackedValue {
+    fn default() -> Self {
+        let ts_vec: Vec<NaiveDateTime> = vec![];
+        let val_vec: Vec<f64> = vec![];
+        TrackedValue(df!["timestamp" => ts_vec, "value" => val_vec].unwrap())
+    }
+}
+
 impl TrackedValue {
     /// Create a new TrackedValue with an initial value and a starting point in time
     ///

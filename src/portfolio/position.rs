@@ -8,9 +8,9 @@ use polars::prelude::*;
 pub trait PositionHandlers {
     fn add_open_position(&mut self, trade: &ExecutedTrade);
 
-    fn get_open_positions(&self) -> Option<DataFrame>;
+    fn get_open_positions(&self) -> Option<Vec<&ExecutedTrade>>;
 
-    fn select_open_positions(&self, price: f64) -> Option<DataFrame>;
+    fn select_open_positions_by_price(&self, price: f64) -> Option<Vec<&ExecutedTrade>>;
     fn available_open_positions(&self) -> usize;
     fn clear_open_positions(&mut self, executed_trade: &ExecutedTrade);
 }
@@ -31,72 +31,37 @@ impl PositionHandlers for Portfolio {
         }
     }
 
-    /// Get open positions
+    /// Returns a [`Vec`] with references to the executed trades that correspond to open positions.
     ///
-    /// This returns the rows in `executed_trades` who's timestamps occur in `open_positions`
-    ///
-    /// # Returns
-    /// A dataframe of trades corresponding to open positions.
     /// If there are no open positions, `None` is returned.
-    fn get_open_positions(&self) -> Option<DataFrame> {
+    fn get_open_positions(&self) -> Option<Vec<&ExecutedTrade>> {
         if self.open_positions.is_empty() {
             return None;
         }
 
-        // create a mask for all rows in `executed_trades` who's timestamps occur in `open_positions`
-        let mask = self
-            .executed_trades
-            .column("point")
-            .unwrap()
-            .datetime()
-            .unwrap()
-            .into_iter()
-            .map(|x| {
-                if let Some(t) = x {
-                    self.open_positions
-                        .contains(&NaiveDateTime::from_timestamp_millis(t).unwrap())
-                } else {
-                    false
-                }
-            })
-            .collect();
-        if let Ok(val) = self.executed_trades.filter(&mask) {
-            Some(val)
-        } else {
-            None
-        }
+        Some(self.open_positions
+            .iter().map(
+                |x| self.executed_trades.get(x).unwrap()
+            ).collect::<Vec<_>>())
     }
 
-    /// Select open positions that are less than price
+    /// Select open positions that are less than the given `price` which may be profitable.
     ///
-    /// This is intended to be used to select open positions that are less than the current price
-    /// and are therefore *may* be profitable.
-    ///
-    /// # Arguments
-    /// * `price` - The price to compare against
-    ///
-    /// # Returns
-    /// A dataframe containing open positions that are less than price
-    /// If there are no open positions or no open positions that are less than price, `None` is returned.
-    fn select_open_positions(&self, price: f64) -> Option<DataFrame> {
+    /// `None` is returned if there are no open positions or no open positions that are less than price.
+    fn select_open_positions_by_price(&self, price: f64) -> Option<Vec<&ExecutedTrade>> {
         if self.open_positions.is_empty() {
             return None;
         }
 
-        // create a mask for all rows in `open_positions` who's price is lte `price`
-        let open_positions = self.get_open_positions().unwrap();
-        let mask = open_positions
-            .column("price")
-            .unwrap()
-            .f64()
-            .unwrap()
-            .lt_eq(price);
-        if let Ok(df) = open_positions.filter(&mask) {
-            if df.height() > 0 {
-                return Some(df);
-            }
+        let selected = self.open_positions.iter().map(
+                |x| self.executed_trades.get(x).unwrap()
+            ).filter(|x| x.get_price() <= price).collect::<Vec<_>>();
+
+        if selected.is_empty() {
+            None
+        } else {
+            Some(selected)
         }
-        None
     }
 
     /// Return the number of available open positions
@@ -126,18 +91,15 @@ impl PositionHandlers for Portfolio {
             return;
         }
 
-        let open_positions = self.select_open_positions(executed_trade.get_price());
+        // TODO: there needs to be a better way to handle how positions are closed
+        let open_positions = self.select_open_positions_by_price(executed_trade.get_price());
 
         if let Some(open_positions) = open_positions {
             // get the timestamps of the open positions
             let open_positions_points = open_positions
-                .column("point")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .into_iter()
-                .map(|x| NaiveDateTime::from_timestamp_millis(x.unwrap()).unwrap())
-                .collect::<Vec<NaiveDateTime>>();
+                .iter()
+                .map(|x| x.get_point())
+                .collect::<Vec<_>>();
 
             // remove the timestamps of the open positions that were closed by the executed trade
             self.open_positions = self
@@ -153,7 +115,7 @@ impl PositionHandlers for Portfolio {
 #[cfg(test)]
 mod tests {
     use crate::portfolio::{Portfolio, PositionHandlers, TradeHandlers};
-    use crate::types::{ExecutedTrade, Side};
+    use crate::types::{ExecutedTrade, Side, Trade};
     use chrono::{Duration, NaiveDateTime, Utc};
 
     /// Test that open positions are correctly added to the `open_positions` vector.
@@ -222,7 +184,7 @@ mod tests {
         portfolio.add_executed_trade(trade3);
 
         // assert that the dataframe returned by `get_open_positions` corresponds to open trades
-        assert_eq!(portfolio.get_open_positions().unwrap().height(), 3);
+        assert_eq!(portfolio.get_open_positions().unwrap().len(), 3);
 
         let expected_price_sum = 1.0 + 1.5 + 1.7;
         let expected_quantity_sum = 1.0 + 0.9 + 1.5;
@@ -230,30 +192,21 @@ mod tests {
         let open_positions = portfolio.get_open_positions().unwrap();
         assert_eq!(
             open_positions
-                .column("quantity")
-                .unwrap()
-                .sum::<f64>()
-                .unwrap(),
+                .iter().map(|x| x.get_quantity())
+                .sum::<f64>(),
             expected_quantity_sum
         );
         assert_eq!(
             open_positions
-                .column("price")
-                .unwrap()
-                .sum::<f64>()
-                .unwrap(),
+                .iter().map(|x| x.get_price())
+                .sum::<f64>(),
             expected_price_sum
-        );
-
-        assert_eq!(
-            open_positions.get_column_names(),
-            &["id", "side", "price", "quantity", "cost", "point"]
         );
     }
 
     #[test]
     fn test_select_open_positions() {
-        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+        let time = Utc::now().naive_utc();
         let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
@@ -293,7 +246,7 @@ mod tests {
         let mut portfolio = Portfolio::new(100.0, 100.0, None);
 
         // assert that `None` is returned when there are no open positions
-        assert_eq!(portfolio.select_open_positions(1.0), None);
+        assert_eq!(portfolio.select_open_positions_by_price(1.0), None);
 
         // add trades to `executed_trades`
         portfolio.add_executed_trade(trade);
@@ -306,29 +259,25 @@ mod tests {
         portfolio.open_positions.pop();
 
         // assert that `None` is returned when price is 0.9
-        let selected_open_positions = portfolio.select_open_positions(0.9);
+        let selected_open_positions = portfolio.select_open_positions_by_price(0.9);
         assert_eq!(selected_open_positions, None);
 
         // assert that the correct number of open positions are returned
         // we will be selecting trades that are less than 1.9
         // therefore only `trade2`, `trade3`, and `trade4` should be returned
-        let selected_open_positions = portfolio.select_open_positions(1.9).unwrap();
+        let selected_open_positions = portfolio.select_open_positions_by_price(1.9).unwrap();
 
-        assert_eq!(selected_open_positions.height(), 3);
+        assert_eq!(selected_open_positions.len(), 3);
         assert_eq!(
             selected_open_positions
-                .column("price")
-                .unwrap()
-                .sum::<f64>()
-                .unwrap(),
+                .iter().map(|x| x.get_price())
+                .sum::<f64>(),
             1.9 + 1.8 + 1.0
         );
         assert_eq!(
             selected_open_positions
-                .column("quantity")
-                .unwrap()
-                .sum::<f64>()
-                .unwrap(),
+                .iter().map(|x| x.get_quantity())
+                .sum::<f64>(),
             1.0 * 3.0
         );
     }
@@ -404,7 +353,7 @@ mod tests {
         let executed_trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
-            1.0,
+            1.1,
             1.0,
             time + Duration::seconds(5),
         );
@@ -417,7 +366,7 @@ mod tests {
             Side::Sell,
             1.9,
             1.0,
-            time + Duration::seconds(5),
+            time + Duration::seconds(6),
         );
         portfolio.clear_open_positions(&executed_trade);
         assert_eq!(portfolio.open_positions.len(), 1);

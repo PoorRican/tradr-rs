@@ -6,12 +6,12 @@ use crate::strategies::Strategy;
 use crate::types::{ExecutedTrade, FutureTrade, Side};
 use crate::utils;
 
-pub struct BacktestingRunner<'a> {
+pub struct BacktestingRunner {
     strategy: Strategy,
     portfolio_args: PortfolioArgs,
 }
 
-impl<'a> BacktestingRunner<'a> {
+impl BacktestingRunner {
     pub fn new(strategy: Strategy, portfolio_args: PortfolioArgs) -> Self {
         BacktestingRunner {
             portfolio_args,

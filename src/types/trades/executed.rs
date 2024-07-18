@@ -7,6 +7,7 @@ use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 
 /// Represents a trade that has been executed on the market
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExecutedTrade {
     id: String,
     side: Side,

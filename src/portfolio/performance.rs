@@ -13,46 +13,17 @@ pub struct PerformanceMetrics {
 
 impl Portfolio {
     pub fn calculate_performance_metrics(&self, risk_free_rate: f64) -> Result<PerformanceMetrics, PolarsError> {
-        let df = &self.executed_trades;
-
-        // Ensure the DataFrame is sorted by timestamp
-        let df = df.sort(&["point"], SortMultipleOptions::new().with_order_descending(false))?;
-
-        let total_return = self.calculate_total_return(&df)?;
-        let total_trades = self.executed_trades.height();
-
-        Ok(PerformanceMetrics {
-            total_return,
-            sharpe_ratio: self.calculate_sharpe_ratio(&df, risk_free_rate)?,
-            max_drawdown: self.calculate_max_drawdown(&df)?,
-            total_trades,
-        })
+        todo!()
     }
 
     // TODO: bad implementation
     fn calculate_total_return(&self, df: &DataFrame) -> Result<f64, PolarsError> {
-        let initial_capital = self.capital_ts.get_last_value();
-        let final_capital = self.available_capital();
-        Ok((final_capital - initial_capital) / initial_capital)
+        todo!()
     }
 
     // TODO: bad implementation
     fn calculate_sharpe_ratio(&self, df: &DataFrame, risk_free_rate: f64) -> Result<f64, PolarsError> {
-        let returns = df.select(["cost", "side"])?
-            .lazy()
-            .with_column(
-                when(col("side").eq(lit(-1)))
-                    .then(col("cost").mul(lit(-1.0)))
-                    .otherwise(col("cost"))
-                    .alias("returns")
-            )
-            .collect()?;
-        let returns = returns.column("returns")?.f64()?;
-
-        let mean_return = returns.mean().unwrap();
-        let std_dev = returns.std(0).unwrap();
-
-        Ok((mean_return - risk_free_rate) / std_dev)
+        todo!()
     }
 
     // TODO: bad implementation
