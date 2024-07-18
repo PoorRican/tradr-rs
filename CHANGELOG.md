@@ -5,6 +5,7 @@
 ### New Features
 
 - Implements a simple backtesting engine
+- Use `rust_decimal` crate for accurate decimal arithmetic. This has not fully been implemented yet.
 
 ### Strategy Improvements
 
