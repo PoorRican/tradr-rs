@@ -4,6 +4,7 @@ mod position;
 mod tracked;
 mod trade;
 mod performance;
+mod risk;
 
 use std::collections::HashMap;
 pub use assets::AssetHandlers;

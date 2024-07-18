@@ -9,6 +9,7 @@
 ### Portfolio Improvements
 
 - Remove all internal of `DataFrame`. Instead, `Vec` and `HashMap` are used to store data.
+- Add risk functions to `Portfolio`
 
 ---
 
