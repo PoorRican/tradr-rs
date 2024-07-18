@@ -33,6 +33,7 @@ impl Strategy {
     /// This method is used upon initial load, or during backtesting.
     // TODO: return errors
     pub fn bootstrap(&mut self, data: &DataFrame) {
+        // todo: check for correct columns of candle data
         for indicator in self.indicators.iter_mut() {
             indicator.process_existing(data);
         }
@@ -165,8 +166,6 @@ impl Strategy {
                 .filter(|x| *x != &"time")
                 .collect::<Vec<&&str>>();
 
-            println!("{:?}", column_names);
-
             // for all columns, get a mask of the rows which are not 0 (ie: `Hold`)
             let mut combined_mask = None;
             column_names.iter().for_each(|x| {
@@ -198,8 +197,8 @@ impl Strategy {
     /// Reference [`Self::get_all_signals`] for what errors are returned.
     // TODO: untested
     pub fn get_combined_signals(&self) -> Result<Option<DataFrame>, ()> {
-        if let Some(signals) = self.get_all_signals().unwrap() {
-            let mut combined = signals.clone();
+        if let Some(signals) = self.get_filtered_signals().unwrap() {
+            let mut signals = signals;
 
             // Sum all signal columns
             let sum_expr: Vec<Expr> = signals
@@ -211,12 +210,12 @@ impl Strategy {
 
             let sum_signals = sum_expr.into_iter().reduce(|acc, x| acc + x).unwrap();
 
-            combined = combined.lazy().with_column(sum_signals.alias("sum_signals")).collect().unwrap();
+            signals = signals.lazy().with_column(sum_signals.alias("sum_signals")).collect().unwrap();
 
             // Apply consensus
             let consensus_expr = match self.consensus {
                 Consensus::Unison => {
-                    let n = self.indicators.len() as i32;
+                    let n = self.indicators.len() as i8;
                     when(col("sum_signals").eq(lit(n)))
                         .then(lit(1i8))
                         .when(col("sum_signals").eq(lit(-n)))
@@ -224,7 +223,7 @@ impl Strategy {
                         .otherwise(lit(0i8))
                 },
                 Consensus::Majority => {
-                    let n = (self.indicators.len() / 2) as i32;
+                    let n = (self.indicators.len() / 2) as i8;
                     when(col("sum_signals").gt(lit(n)))
                         .then(lit(1i8))
                         .when(col("sum_signals").lt(lit(-n)))
@@ -233,9 +232,11 @@ impl Strategy {
                 },
             };
 
-            combined = combined.lazy().with_column(consensus_expr.alias("signals")).collect().unwrap();
+            signals = signals.lazy()
+                .with_column(consensus_expr.cast(DataType::Int8).alias("signals"))
+                .collect().unwrap();
 
-            Ok(Some(combined.select(["time", "signals"]).unwrap()))
+            Ok(Some(signals.select(["time", "signals"]).unwrap()))
         } else {
             Ok(None)
         }

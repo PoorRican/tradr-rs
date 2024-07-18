@@ -2,6 +2,10 @@
 
 ## v0.2.1
 
+### New Features
+
+- Implements a simple backtesting engine
+
 ### Strategy Improvements
 
 - Implement `Strategy.get_combined_signals` (untested)
@@ -14,6 +18,11 @@
 
 - Add `Err` return values to `BBands.process_graph_for_new_candles()`
 - Formally test `BBands.Gprocess_graph_for_new_candles()`
+
+### Utility Improvements
+
+- Create util for extracting `Vec<Candle>` from a dataframe
+- Create util for extracting `Vec<Side>` from a dataframe
 
 ---
 

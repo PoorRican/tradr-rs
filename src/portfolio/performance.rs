@@ -1,6 +1,7 @@
 use polars::prelude::*;
 use crate::portfolio::{CapitalHandlers, Portfolio};
 use std::ops::Mul;
+use crate::types::Side;
 
 #[derive(Debug)]
 pub struct PerformanceMetrics {
@@ -28,17 +29,19 @@ impl Portfolio {
         })
     }
 
+    // TODO: bad implementation
     fn calculate_total_return(&self, df: &DataFrame) -> Result<f64, PolarsError> {
         let initial_capital = self.capital_ts.get_last_value();
         let final_capital = self.get_capital();
         Ok((final_capital - initial_capital) / initial_capital)
     }
 
+    // TODO: bad implementation
     fn calculate_sharpe_ratio(&self, df: &DataFrame, risk_free_rate: f64) -> Result<f64, PolarsError> {
         let returns = df.select(["cost", "side"])?
             .lazy()
             .with_column(
-                when(col("side").eq(lit("Buy")))
+                when(col("side").eq(lit(-1)))
                     .then(col("cost").mul(lit(-1.0)))
                     .otherwise(col("cost"))
                     .alias("returns")
@@ -52,30 +55,27 @@ impl Portfolio {
         Ok((mean_return - risk_free_rate) / std_dev)
     }
 
+    // TODO: bad implementation
     fn calculate_max_drawdown(&self, df: &DataFrame) -> Result<f64, PolarsError> {
-        let mut cumulative_returns = df.select(["cost", "side"])?;
-        let cumulative_returns = cumulative_returns
-            .apply("cost", |s| {
-                let costs = s.f64().unwrap();
-                let sides = df.column("side").unwrap().str().unwrap();
-                let mut cumulative = 1.0;
-                let returns = costs.into_iter().zip(sides.into_iter())
-                    .map(|(cost, side)| {
-                        if let Some(c) = cost {
-                            if side == Some("Buy") {
-                                cumulative *= 1.0 - c;
-                            } else {
-                                cumulative *= 1.0 + c;
-                            }
-                        }
-                        cumulative
-                    })
-                    .collect::<Vec<f64>>();
-                Series::new("cumulative_returns", returns)
-            })?;
+        let costs = df.column("cost")?.f64().unwrap();
+        let sides = df.column("side").unwrap().i8().unwrap();
+        let mut cumulative = 1.0;
+        let returns = costs.into_iter().zip(sides.into_iter())
+            .map(|(cost, side)| {
+                if let Some(c) = cost {
+                    if side == Some(Side::Buy.into()) {
+                        cumulative *= 1.0 - c;
+                    } else {
+                        cumulative *= 1.0 + c;
+                    }
+                }
+                cumulative
+            })
+            .collect::<Vec<f64>>();
+        let returns = Series::new("cumulative_returns", returns);
 
-        let peak: f64 = cumulative_returns.column("cumulative_returns").unwrap().max().unwrap().unwrap();
-        let trough: f64 = cumulative_returns.column("cumulative_returns").unwrap().min().unwrap().unwrap();
+        let peak: f64 = returns.max().unwrap().unwrap();
+        let trough: f64 = returns.min().unwrap().unwrap();
         Ok((trough - peak.clone()) / peak)
     }
 }

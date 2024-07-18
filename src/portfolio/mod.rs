@@ -11,6 +11,7 @@ pub use capital::CapitalHandlers;
 pub use persistence::Persistence;
 pub use position::PositionHandlers;
 pub use trade::TradeHandlers;
+pub use performance::PerformanceMetrics;
 
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
