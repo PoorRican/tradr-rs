@@ -22,6 +22,61 @@ pub const DEFAULT_LIMIT: usize = 4;
 pub const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
 pub const DEFAULT_THRESHOLD: f64 = 0.50;
 
+/// Arguments for creating a new portfolio via the [`Portfolio::from_args`] constructor
+///
+/// This is used in backtesting to dynamically creating a [`Portfolio`] with the desired parameters when the
+/// start time (used for internal tracking) is not known.
+///
+/// # Examples
+///
+/// All configurable parameters are accessible via the fields of the struct.
+///
+/// ```
+/// use crate::portfolio::{PortfolioArgs, Portfolio};
+///
+/// let args = PortfolioArgs {
+///    assets: 0.0,
+///    capital: 100.0,
+///    threshold: 0.25,
+///    open_positions_limit: 2,
+///    timeout: 60 * 2,
+/// };
+///
+/// // create a new Portfolio using the `from_args` constructor
+/// let portfolio = Portfolio::from_args(&args, NaiveDateTime::from_timestamp(0, 0));
+/// ```
+///
+/// Any value that is not provided will default to the value specified in the [`Default`] implementation.
+/// ```
+/// use crate::portfolio::{PortfolioArgs, Portfolio};
+///
+/// let args = PortfolioArgs {
+///    assets: 0.0,
+///    capital: 100.0,
+///   ..Default::default()
+/// };
+///
+/// let portfolio = Portfolio::from_args(&args, NaiveDateTime::from_timestamp(0, 0));
+/// ```
+pub struct PortfolioArgs {
+    pub assets: f64,
+    pub capital: f64,
+    pub threshold: f64,
+    pub open_positions_limit: usize,
+    pub timeout: i64,
+}
+impl Default for PortfolioArgs {
+    fn default() -> Self {
+        PortfolioArgs {
+            assets: 0.0,
+            capital: 100.0,
+            threshold: DEFAULT_THRESHOLD,
+            open_positions_limit: DEFAULT_LIMIT,
+            timeout: DEFAULT_TIMEOUT_MINUTES,
+        }
+    }
+}
+
 /// This struct is used to manage an entire portfolio for a given asset.
 ///
 /// It is responsible for managing the assets and capital available to the portfolio,
@@ -59,6 +114,21 @@ impl Portfolio {
             capital_ts: TrackedValue::with_initial(capital, point),
             open_positions_limit: DEFAULT_LIMIT,
             timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
+            fee_calculator: None,
+        }
+    }
+
+    pub fn from_args(args: &PortfolioArgs, start_time: NaiveDateTime) -> Self {
+        Self {
+            failed_trades: DataFrame::empty(),
+            executed_trades: DataFrame::empty(),
+            open_positions: vec![],
+
+            threshold: args.threshold,
+            assets_ts: TrackedValue::with_initial(args.assets, start_time),
+            capital_ts: TrackedValue::with_initial(args.capital, start_time),
+            open_positions_limit: args.open_positions_limit,
+            timeout: Duration::minutes(args.timeout),
             fee_calculator: None,
         }
     }
