@@ -13,7 +13,6 @@ mod timing;
 mod traits;
 mod types;
 mod utils;
-mod timing;
 
 fn main() {
     let db_path = "data/candle_data.sqlite3";

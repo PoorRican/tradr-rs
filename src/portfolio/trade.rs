@@ -6,7 +6,6 @@ use crate::portfolio::Portfolio;
 use crate::traits::AsDataFrame;
 use crate::types::{Candle, ExecutedTrade, FailedTrade, FutureTrade, Side, Trade};
 use chrono::{NaiveDateTime, Utc};
-use polars::prelude::DataFrame;
 
 /// Interface methods for storing and retrieving trades, and determining when to trade
 pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
@@ -18,8 +17,10 @@ pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
     fn generate_sell_opt(&self, candle: &Candle) -> Option<FutureTrade>;
     #[deprecated(note="Responsibility is moving to crate::PositionManager")]
     fn generate_buy_opt(&self, candle: &Candle) -> Option<FutureTrade>;
+    #[deprecated(note="Responsibility is moving to crate::PositionManager")]
     fn get_buy_cost(&self) -> f64;
     fn get_last_trade(&self) -> Option<&ExecutedTrade>;
+    #[deprecated(note="Responsibility is moving to crate::PositionManager")]
     fn able_to_buy(&self) -> bool;
 }
 
