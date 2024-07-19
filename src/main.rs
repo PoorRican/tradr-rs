@@ -1,5 +1,6 @@
 use crate::traits::AsDataFrame;
 use polars::prelude::*;
+use rust_decimal_macros::dec;
 use crate::backtesting::BacktestingRunner;
 use crate::portfolio::PortfolioArgs;
 
@@ -28,9 +29,9 @@ fn main() {
     let mut runner = BacktestingRunner::new(
         strategy,
         PortfolioArgs {
-        assets: 0.0,
-        capital: 100.0,
-        threshold: 0.0,
+        assets: dec!(0.0),
+        capital: dec!(100.0),
+        threshold: dec!(0.0),
         ..Default::default()
     });
 

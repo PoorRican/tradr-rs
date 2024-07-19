@@ -14,11 +14,13 @@ pub use trade::TradeHandlers;
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
 use chrono::{Duration, NaiveDateTime, Utc};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use crate::types::{ExecutedTrade, FailedTrade};
 
 pub const DEFAULT_LIMIT: usize = 4;
 pub const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
-pub const DEFAULT_THRESHOLD: f64 = 0.50;
+pub const DEFAULT_THRESHOLD: Decimal = dec!(0.5);
 
 /// Arguments for creating a new portfolio via the [`Portfolio::from_args`] constructor
 ///
@@ -57,17 +59,17 @@ pub const DEFAULT_THRESHOLD: f64 = 0.50;
 /// let portfolio = Portfolio::from_args(&args, NaiveDateTime::from_timestamp(0, 0));
 /// ```
 pub struct PortfolioArgs {
-    pub assets: f64,
-    pub capital: f64,
-    pub threshold: f64,
+    pub assets: Decimal,
+    pub capital: Decimal,
+    pub threshold: Decimal,
     pub open_positions_limit: usize,
     pub timeout: i64,
 }
 impl Default for PortfolioArgs {
     fn default() -> Self {
         PortfolioArgs {
-            assets: 0.0,
-            capital: 100.0,
+            assets: dec!(0.0),
+            capital: dec!(100.0),
             threshold: DEFAULT_THRESHOLD,
             open_positions_limit: DEFAULT_LIMIT,
             timeout: DEFAULT_TIMEOUT_MINUTES,
@@ -84,7 +86,7 @@ pub struct Portfolio {
     executed_trades: HashMap<NaiveDateTime, ExecutedTrade>,
     open_positions: Vec<NaiveDateTime>,
 
-    threshold: f64,
+    threshold: Decimal,
     assets_ts: TrackedValue,
     capital_ts: TrackedValue,
     open_positions_limit: usize,
@@ -112,7 +114,7 @@ impl Default for Portfolio {
 }
 
 impl Portfolio {
-    pub fn new<T>(assets: f64, capital: f64, timestamp: T) -> Portfolio
+    pub fn new<T>(assets: Decimal, capital: Decimal, timestamp: T) -> Portfolio
     where
         T: Into<Option<NaiveDateTime>>,
     {
@@ -173,7 +175,7 @@ impl Portfolio {
     ///
     /// # Arguments
     /// * `threshold` - The new profitability threshold in unit currency
-    pub fn set_threshold(&mut self, threshold: f64) {
+    pub fn set_threshold(&mut self, threshold: Decimal) {
         self.threshold = threshold;
     }
 
@@ -209,12 +211,12 @@ mod tests {
         use crate::types::Side;
         use chrono::NaiveDateTime;
 
-        let assets = 100.0;
-        let capital = 100.0;
+        let assets = dec!(100.0);
+        let capital = dec!(100.0);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let mut portfolio = Portfolio::new(assets, capital, point);
-        let trade = FutureTrade::new(Side::Buy, 100.0, 1.0, point + Duration::seconds(1));
+        let trade = FutureTrade::new(Side::Buy, dec!(100.0), dec!(1.0), point + Duration::seconds(1));
         let executed_trade = ExecutedTrade::with_future_trade("id".to_string(), trade.clone());
         let failed_trade =
             FailedTrade::with_future_trade(ReasonCode::MarketRejection, trade.clone());
@@ -231,8 +233,8 @@ mod tests {
         );
 
         // assert that assets and capital `TrackedValues` were initialized correctly
-        assert_eq!(portfolio.get_assets(), assets + 1.0);
-        assert_eq!(portfolio.available_capital(), capital - 100.0);
+        assert_eq!(portfolio.get_assets(), assets + dec!(1.0));
+        assert_eq!(portfolio.available_capital(), capital - dec!(100.0));
 
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
@@ -252,8 +254,8 @@ mod tests {
     fn test_new() {
         use chrono::NaiveDateTime;
 
-        let assets = 100.0;
-        let capital = 100.0;
+        let assets = dec!(100.0);
+        let capital = dec!(100.0);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let portfolio = Portfolio::new(assets, capital, point);
@@ -279,25 +281,25 @@ mod tests {
     #[test]
     fn test_add_fee_calculator() {
         use crate::markets::SimplePercentageFee;
-        let portfolio = Portfolio::new(100.0, 100.0, None);
+        let portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
         assert!(portfolio.fee_calculator.is_none());
 
-        let portfolio = portfolio.add_fee_calculator(SimplePercentageFee::new(0.8));
+        let portfolio = portfolio.add_fee_calculator(SimplePercentageFee::new(dec!(0.8)));
         assert!(portfolio.fee_calculator.is_some());
     }
 
     #[test]
     fn test_set_threshold() {
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
 
-        portfolio.set_threshold(0.25);
-        assert_eq!(portfolio.threshold, 0.25);
+        portfolio.set_threshold(dec!(0.25));
+        assert_eq!(portfolio.threshold, dec!(0.25));
     }
 
     #[test]
     fn test_set_open_positions_limit() {
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
         assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
 
         portfolio.set_open_positions_limit(2);
@@ -306,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_set_timeout() {
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
         assert_eq!(
             portfolio.timeout,
             Duration::minutes(DEFAULT_TIMEOUT_MINUTES)

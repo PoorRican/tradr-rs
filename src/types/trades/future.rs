@@ -4,21 +4,23 @@ use crate::types::trades::{calc_cost, Trade};
 use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
 /// Represents a potential trade to be executed
 #[derive(Clone, Debug, PartialEq)]
 pub struct FutureTrade {
     side: Side,
-    price: f64,
-    quantity: f64,
-    cost: f64,
+    price: Decimal,
+    quantity: Decimal,
+    cost: Decimal,
     /// The time at which the trade was identified
     point: NaiveDateTime,
 }
 
 impl FutureTrade {
     /// Create a new potential trade
-    pub fn new(side: Side, price: f64, quantity: f64, point: NaiveDateTime) -> FutureTrade {
+    pub fn new(side: Side, price: Decimal, quantity: Decimal, point: NaiveDateTime) -> FutureTrade {
         let cost = calc_cost(price, quantity);
         FutureTrade {
             side,
@@ -33,9 +35,9 @@ impl FutureTrade {
         let quantity = cost / price;
         FutureTrade {
             side,
-            price,
-            quantity,
-            cost,
+            price: Decimal::from_f64(price).unwrap(),
+            quantity: Decimal::from_f64(quantity).unwrap(),
+            cost: Decimal::from_f64(cost).unwrap(),
             point,
         }
     }
@@ -46,15 +48,15 @@ impl Trade for FutureTrade {
         self.side
     }
 
-    fn get_price(&self) -> f64 {
+    fn get_price(&self) -> Decimal {
         self.price
     }
 
-    fn get_quantity(&self) -> f64 {
+    fn get_quantity(&self) -> Decimal {
         self.quantity
     }
 
-    fn get_cost(&self) -> f64 {
+    fn get_cost(&self) -> Decimal {
         self.cost
     }
 
@@ -69,12 +71,13 @@ mod tests {
     use crate::types::trades::future::FutureTrade;
     use crate::types::trades::Trade;
     use chrono::{NaiveDateTime, Utc};
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new() {
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let trade = FutureTrade::new(side, price, quantity, point);

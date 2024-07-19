@@ -6,6 +6,7 @@
 
 - Remove `Engine`. This will be replaced with an updated implementation in the future.
 - Remove `AsDataFrame` trait-bound from `Trade`. Removed implementations from `ExecutedTrade`, `FutureTrade`, and `Trade`.
+- Implement `Decimal` as the floating-point type for `Trade`, `Candle`, and `Portfolio`.
 
 ### Portfolio Improvements
 

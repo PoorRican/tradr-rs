@@ -4,13 +4,14 @@ use crate::types::{ExecutedTrade, Trade};
 use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::*;
+use rust_decimal::Decimal;
 
 pub trait PositionHandlers {
     fn add_open_position(&mut self, trade: &ExecutedTrade);
 
     fn get_open_positions(&self) -> Option<Vec<&ExecutedTrade>>;
 
-    fn select_open_positions_by_price(&self, price: f64) -> Option<Vec<&ExecutedTrade>>;
+    fn select_open_positions_by_price(&self, price: Decimal) -> Option<Vec<&ExecutedTrade>>;
     fn available_open_positions(&self) -> usize;
     fn clear_open_positions(&mut self, executed_trade: &ExecutedTrade);
 }
@@ -48,7 +49,7 @@ impl PositionHandlers for Portfolio {
     /// Select open positions that are less than the given `price` which may be profitable.
     ///
     /// `None` is returned if there are no open positions or no open positions that are less than price.
-    fn select_open_positions_by_price(&self, price: f64) -> Option<Vec<&ExecutedTrade>> {
+    fn select_open_positions_by_price(&self, price: Decimal) -> Option<Vec<&ExecutedTrade>> {
         if self.open_positions.is_empty() {
             return None;
         }
@@ -117,6 +118,9 @@ mod tests {
     use crate::portfolio::{Portfolio, PositionHandlers, TradeHandlers};
     use crate::types::{ExecutedTrade, Side, Trade};
     use chrono::{Duration, NaiveDateTime, Utc};
+    use rust_decimal::Decimal;
+    use rust_decimal::prelude::FromPrimitive;
+    use rust_decimal_macros::dec;
 
     /// Test that open positions are correctly added to the `open_positions` vector.
     /// Also ensure that closed positions are not added to the `open_positions` vector.
@@ -124,12 +128,12 @@ mod tests {
     fn test_set_as_open_position() {
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
 
         assert!(portfolio.open_positions.is_empty());
 
         // add a buy and assert it is added to `open_positions`
-        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 1.0, 1.0, time);
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
         portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 1);
 
@@ -137,8 +141,8 @@ mod tests {
         let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
-            1.0,
-            1.0,
+            dec!(1.0),
+            dec!(1.0),
             time + Duration::minutes(1),
         );
         portfolio.add_open_position(&trade);
@@ -146,7 +150,7 @@ mod tests {
 
         // add another buy and assert it is added to `open_positions`
         let time2 = time + Duration::minutes(2);
-        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 1.0, 1.0, time2);
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time2);
         portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 2);
 
@@ -157,25 +161,25 @@ mod tests {
 
     #[test]
     fn test_get_open_positions() {
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
         assert_eq!(portfolio.get_open_positions(), None);
 
         // create some executed trades
         // only `trade` and `trade3` should be returned by `get_open_positions`
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, 1.0, 1.0, time);
+        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
         let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.5,
-            0.9,
+            dec!(1.5),
+            dec!(0.9),
             time + Duration::seconds(1),
         );
         let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.7,
-            1.5,
+            dec!(1.7),
+            dec!(1.5),
             time + Duration::seconds(2),
         );
 
@@ -186,20 +190,20 @@ mod tests {
         // assert that the dataframe returned by `get_open_positions` corresponds to open trades
         assert_eq!(portfolio.get_open_positions().unwrap().len(), 3);
 
-        let expected_price_sum = 1.0 + 1.5 + 1.7;
-        let expected_quantity_sum = 1.0 + 0.9 + 1.5;
+        let expected_price_sum = Decimal::from_f64(1.0 + 1.5 + 1.7).unwrap();
+        let expected_quantity_sum = Decimal::from_f64(1.0 + 0.9 + 1.5).unwrap();
 
         let open_positions = portfolio.get_open_positions().unwrap();
         assert_eq!(
             open_positions
                 .iter().map(|x| x.get_quantity())
-                .sum::<f64>(),
+                .sum::<Decimal>(),
             expected_quantity_sum
         );
         assert_eq!(
             open_positions
                 .iter().map(|x| x.get_price())
-                .sum::<f64>(),
+                .sum::<Decimal>(),
             expected_price_sum
         );
     }
@@ -210,43 +214,43 @@ mod tests {
         let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            2.0,
-            1.0,
+            dec!(2.0),
+            dec!(1.0),
             time + Duration::seconds(1),
         );
         let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.9,
-            1.0,
+            dec!(1.9),
+            dec!(1.0),
             time + Duration::seconds(2),
         );
         let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.8,
-            1.0,
+            dec!(1.8),
+            dec!(1.0),
             time + Duration::seconds(3),
         );
         let trade4 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.0,
-            1.0,
+            dec!(1.0),
+            dec!(1.0),
             time + Duration::seconds(4),
         );
         let trade5 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            0.1,
-            1.0,
+            dec!(0.1),
+            dec!(1.0),
             time + Duration::seconds(5),
         );
 
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
 
         // assert that `None` is returned when there are no open positions
-        assert_eq!(portfolio.select_open_positions_by_price(1.0), None);
+        assert_eq!(portfolio.select_open_positions_by_price(dec!(1.0)), None);
 
         // add trades to `executed_trades`
         portfolio.add_executed_trade(trade);
@@ -259,32 +263,32 @@ mod tests {
         portfolio.open_positions.pop();
 
         // assert that `None` is returned when price is 0.9
-        let selected_open_positions = portfolio.select_open_positions_by_price(0.9);
+        let selected_open_positions = portfolio.select_open_positions_by_price(dec!(0.9));
         assert_eq!(selected_open_positions, None);
 
         // assert that the correct number of open positions are returned
         // we will be selecting trades that are less than 1.9
         // therefore only `trade2`, `trade3`, and `trade4` should be returned
-        let selected_open_positions = portfolio.select_open_positions_by_price(1.9).unwrap();
+        let selected_open_positions = portfolio.select_open_positions_by_price(dec!(1.9)).unwrap();
 
         assert_eq!(selected_open_positions.len(), 3);
         assert_eq!(
             selected_open_positions
                 .iter().map(|x| x.get_price())
-                .sum::<f64>(),
-            1.9 + 1.8 + 1.0
+                .sum::<Decimal>(),
+            Decimal::from_f64(1.9 + 1.8 + 1.0).unwrap()
         );
         assert_eq!(
             selected_open_positions
                 .iter().map(|x| x.get_quantity())
-                .sum::<f64>(),
-            1.0 * 3.0
+                .sum::<Decimal>(),
+            Decimal::from_f64(1.0 * 3.0).unwrap()
         );
     }
 
     #[test]
     fn test_available_open_positions() {
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
 
         // assert that `available_open_positions` is maxed when there are no open positions
         portfolio.open_positions_limit = 10;
@@ -308,36 +312,36 @@ mod tests {
 
     #[test]
     fn test_clear_open_positions() {
-        let mut portfolio = Portfolio::new(100.0, 100.0, None);
+        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
 
         // create some open positions with varying prices
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
         let trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            2.0,
-            1.0,
+            dec!(2.0),
+            dec!(1.0),
             time + Duration::seconds(1),
         );
         let trade2 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.9,
-            1.0,
+            dec!(1.9),
+            dec!(1.0),
             time + Duration::seconds(2),
         );
         let trade3 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.8,
-            1.0,
+            dec!(1.8),
+            dec!(1.0),
             time + Duration::seconds(3),
         );
         let trade4 = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Buy,
-            1.0,
-            1.0,
+            dec!(1.0),
+            dec!(1.0),
             time + Duration::seconds(4),
         );
 
@@ -353,8 +357,8 @@ mod tests {
         let executed_trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
-            1.1,
-            1.0,
+            dec!(1.1),
+            dec!(1.0),
             time + Duration::seconds(5),
         );
         portfolio.clear_open_positions(&executed_trade);
@@ -364,8 +368,8 @@ mod tests {
         let executed_trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
-            1.9,
-            1.0,
+            dec!(1.9),
+            dec!(1.0),
             time + Duration::seconds(6),
         );
         portfolio.clear_open_positions(&executed_trade);
@@ -376,8 +380,8 @@ mod tests {
         let executed_trade = ExecutedTrade::new_without_cost(
             "id".to_string(),
             Side::Sell,
-            2.0,
-            1.0,
+            dec!(2.0),
+            dec!(1.0),
             time + Duration::seconds(6),
         );
         portfolio.clear_open_positions(&executed_trade);

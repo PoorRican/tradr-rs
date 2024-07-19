@@ -1,7 +1,6 @@
-use polars::export::num::real::Real;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, MathematicalOps};
 use rust_decimal_macros::dec;
-use crate::portfolio::{AssetHandlers, Portfolio, PositionHandlers};
+use crate::portfolio::{Portfolio, PositionHandlers};
 use crate::types::{Candle, Trade};
 
 impl Portfolio {
@@ -26,16 +25,16 @@ impl Portfolio {
 
     /// Sums the current value of all open positions based on the latest price
     fn calculate_total_position_value(&self, current_price: Decimal) -> Decimal {
-        self.get_open_positions().iter().fold(dec!(0), |acc, trade| {
-            acc + Decimal::from(trade.get_quantity() * current_price)
+        self.get_open_positions().unwrap().iter().fold(dec!(0), |acc, trade| {
+            acc + trade.get_quantity() * current_price
         })
     }
 
     /// Calculates the weighted average price at which the open positions were entered
     fn calculate_average_entry_price(&self) -> Decimal {
-        let (total_cost, total_quantity) = self.get_open_positions().iter().fold((dec!(0), dec!(0)), |(cost, qty), trade| {
-            (cost + Decimal::from(trade.get_cost()),
-             qty + Decimal::from(trade.get_quantity()))
+        let (total_cost, total_quantity) = self.get_open_positions().unwrap().iter().fold((dec!(0), dec!(0)), |(cost, qty), trade| {
+            (cost + trade.get_cost(),
+             qty + trade.get_quantity())
         });
         if total_quantity.is_zero() {
             dec!(0)
@@ -46,7 +45,7 @@ impl Portfolio {
 
     /// Computes the current unrealized profit or loss of all open positions
     fn calculate_unrealized_pnl(&self, current_price: Decimal) -> Decimal {
-        self.get_open_positions().iter().fold(dec!(0), |acc, trade| {
+        self.get_open_positions().unwrap().iter().fold(dec!(0), |acc, trade| {
             let position_value = Decimal::from(trade.get_quantity() * current_price);
             let cost_basis = Decimal::from(trade.get_cost());
             acc + (position_value - cost_basis)
@@ -61,7 +60,7 @@ impl Portfolio {
             .map(|window| {
                 let prev = window[0].close;
                 let current = window[1].close;
-                Decimal::from((current - prev) / prev)
+                (current - prev) / prev
             })
             .collect();
 
@@ -74,7 +73,7 @@ impl Portfolio {
         let var_index = (sorted_returns.len() as f64 * 0.05) as usize;
         let var_95 = sorted_returns.get(var_index).cloned().unwrap_or_default();
 
-        self.calculate_total_position_value(historical_data.last().unwrap().close()) * var_95
+        self.calculate_total_position_value(historical_data.last().unwrap().close) * var_95
     }
 
     /// Measures the volatility of the asset relative to the market.
@@ -118,7 +117,7 @@ impl Portfolio {
         let variance = returns.iter()
             .map(|&r| (r - mean_return) * (r - mean_return))
             .sum::<Decimal>() / Decimal::from(returns.len() - 1);
-        let std_dev = variance.sqrt();
+        let std_dev = variance.sqrt().unwrap();
 
         if std_dev.is_zero() {
             dec!(0)

@@ -4,14 +4,16 @@ use crate::types::trades::future::FutureTrade;
 use crate::types::trades::{calc_cost, Trade};
 use chrono::NaiveDateTime;
 use polars::prelude::{NamedFrom, Series};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
 /// Represents a trade that has been rejected by the market or otherwise failed
 pub struct FailedTrade {
     reason: ReasonCode,
     side: Side,
-    price: f64,
-    quantity: f64,
-    cost: f64,
+    price: Decimal,
+    quantity: Decimal,
+    cost: Decimal,
     point: NaiveDateTime,
 }
 
@@ -19,8 +21,8 @@ impl FailedTrade {
     pub fn new(
         reason: ReasonCode,
         side: Side,
-        price: f64,
-        quantity: f64,
+        price: Decimal,
+        quantity: Decimal,
         point: NaiveDateTime,
     ) -> FailedTrade {
         let cost = calc_cost(price, quantity);
@@ -51,15 +53,15 @@ impl Trade for FailedTrade {
         self.side
     }
 
-    fn get_price(&self) -> f64 {
+    fn get_price(&self) -> Decimal {
         self.price
     }
 
-    fn get_quantity(&self) -> f64 {
+    fn get_quantity(&self) -> Decimal {
         self.quantity
     }
 
-    fn get_cost(&self) -> f64 {
+    fn get_cost(&self) -> Decimal {
         self.cost
     }
 
@@ -71,17 +73,17 @@ impl Trade for FailedTrade {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::traits::AsDataFrame;
     use crate::types::signals::Side;
     use crate::types::trades::calc_cost;
     use chrono::Utc;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new() {
         let reason = ReasonCode::Unknown;
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
         let cost = calc_cost(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
@@ -100,8 +102,8 @@ mod test {
     fn test_with_future_trade() {
         let reason = ReasonCode::Unknown;
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
         let cost = calc_cost(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 

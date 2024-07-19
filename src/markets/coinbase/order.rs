@@ -1,4 +1,6 @@
 use chrono::NaiveDateTime;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -117,8 +119,8 @@ impl CoinbaseOrderRequest {
         Self::new_limit_order(
             trade.get_side(),
             product_id,
-            trade.get_price(),
-            trade.get_quantity(),
+            trade.get_price().to_f64().unwrap(),
+            trade.get_quantity().to_f64().unwrap(),
         )
     }
 
@@ -218,9 +220,9 @@ impl Into<ExecutedTrade> for CoinbaseOrderResponse {
         ExecutedTrade::new(
             self.id.to_string(),
             self.side,
-            self.price,
-            self.size,
-            self.filled_size,
+            Decimal::from_f64(self.price).unwrap(),
+            Decimal::from_f64(self.size).unwrap(),
+            Decimal::from_f64(self.filled_size).unwrap(),
             point,
         )
     }
@@ -262,6 +264,8 @@ mod order_type_tests {
 
 #[cfg(test)]
 mod order_request_tests {
+    use rust_decimal::prelude::ToPrimitive;
+    use rust_decimal_macros::dec;
     use crate::markets::coinbase::order::CoinbaseOrderRequest;
     use crate::types::FutureTrade;
 
@@ -287,8 +291,8 @@ mod order_request_tests {
 
     #[test]
     fn test_with_future_trade() {
-        let price = 100.0;
-        let quantity = 1.0;
+        let price = dec!(100.0);
+        let quantity = dec!(1.0);
         let product_id = "BTC-USD".to_string();
 
         // try with a buy order
@@ -303,8 +307,8 @@ mod order_request_tests {
 
         assert_eq!(order.side, super::Side::Buy);
         assert_eq!(order.product_id, product_id);
-        assert_eq!(order.price, Some(price));
-        assert_eq!(order.size, Some(quantity));
+        assert_eq!(order.price, price.to_f64());
+        assert_eq!(order.size, quantity.to_f64());
 
         // try with a sell order
         let trade = FutureTrade::new(
@@ -318,8 +322,8 @@ mod order_request_tests {
 
         assert_eq!(order.side, super::Side::Sell);
         assert_eq!(order.product_id, product_id);
-        assert_eq!(order.price, Some(price));
-        assert_eq!(order.size, Some(quantity));
+        assert_eq!(order.price, price.to_f64());
+        assert_eq!(order.size, quantity.to_f64());
     }
 
     #[test]
@@ -341,6 +345,7 @@ mod order_response_tests {
     use crate::types::Side;
     use crate::types::{ExecutedTrade, Trade};
     use chrono::NaiveDateTime;
+    use rust_decimal::prelude::ToPrimitive;
 
     #[test]
     fn test_order_response_into_executed_trade() {
@@ -376,8 +381,8 @@ mod order_response_tests {
         let trade: ExecutedTrade = order.clone().into();
         assert_eq!(trade.get_id(), &order.id.to_string());
         assert_eq!(trade.get_side(), order.side);
-        assert_eq!(trade.get_price(), order.price);
-        assert_eq!(trade.get_quantity(), order.size);
+        assert_eq!(trade.get_price().to_f64().unwrap(), order.price);
+        assert_eq!(trade.get_quantity().to_f64().unwrap(), order.size);
         assert_eq!(
             *trade.get_point(),
             NaiveDateTime::parse_from_str(&order.created_at, "%Y-%m-%dT%H:%M:%S%.fZ").unwrap()

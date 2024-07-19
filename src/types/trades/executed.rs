@@ -3,15 +3,17 @@ use crate::types::trades::future::FutureTrade;
 use crate::types::trades::{calc_cost, Trade};
 use chrono::NaiveDateTime;
 use polars::prelude::{NamedFrom, Series};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 
 /// Represents a trade that has been executed on the market
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExecutedTrade {
     id: String,
     side: Side,
-    price: f64,
-    quantity: f64,
-    cost: f64,
+    price: Decimal,
+    quantity: Decimal,
+    cost: Decimal,
     point: NaiveDateTime,
 }
 
@@ -19,9 +21,9 @@ impl ExecutedTrade {
     pub fn new(
         id: String,
         side: Side,
-        price: f64,
-        quantity: f64,
-        cost: f64,
+        price: Decimal,
+        quantity: Decimal,
+        cost: Decimal,
         point: NaiveDateTime,
     ) -> Self {
         ExecutedTrade {
@@ -41,8 +43,8 @@ impl ExecutedTrade {
     pub fn new_without_cost(
         id: String,
         side: Side,
-        price: f64,
-        quantity: f64,
+        price: Decimal,
+        quantity: Decimal,
         point: NaiveDateTime,
     ) -> ExecutedTrade {
         let cost = calc_cost(price, quantity);
@@ -69,35 +71,6 @@ impl ExecutedTrade {
     pub fn get_id(&self) -> &String {
         &self.id
     }
-
-    pub fn from_row(row: &DataFrame) -> Self {
-        assert_eq!(row.height(), 1);
-        assert_eq!(
-            row.get_column_names(),
-            &["id", "side", "price", "quantity", "cost", "point"]
-        );
-        let id = row.column("id").unwrap().str().unwrap().get(0).unwrap();
-        let side = Side::from(row.column("side").unwrap().i8().unwrap().get(0).unwrap());
-        let price = row.column("price").unwrap().f64().unwrap().get(0).unwrap();
-        let quantity = row
-            .column("quantity")
-            .unwrap()
-            .f64()
-            .unwrap()
-            .get(0)
-            .unwrap();
-        let cost = row.column("cost").unwrap().f64().unwrap().get(0).unwrap();
-        let point = NaiveDateTime::from_timestamp_millis(
-            row.column("point")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-        )
-        .unwrap();
-        ExecutedTrade::new(id.to_string(), side, price, quantity, cost, point)
-    }
 }
 
 impl Trade for ExecutedTrade {
@@ -105,15 +78,15 @@ impl Trade for ExecutedTrade {
         self.side
     }
 
-    fn get_price(&self) -> f64 {
+    fn get_price(&self) -> Decimal {
         self.price
     }
 
-    fn get_quantity(&self) -> f64 {
+    fn get_quantity(&self) -> Decimal {
         self.quantity
     }
 
-    fn get_cost(&self) -> f64 {
+    fn get_cost(&self) -> Decimal {
         self.cost
     }
 
@@ -128,14 +101,15 @@ mod test {
     use crate::types::signals::Side;
     use crate::types::trades::calc_cost;
     use chrono::Utc;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new() {
         let id = "id".to_string();
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = 3.0;
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
+        let cost = dec!(3.0);
         let point = Utc::now().naive_utc();
 
         let trade = ExecutedTrade::new(id.clone(), side, price, quantity, cost, point.clone());
@@ -152,8 +126,8 @@ mod test {
     fn test_new_without_cost() {
         let id = "id".to_string();
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
         let cost = calc_cost(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
@@ -172,8 +146,8 @@ mod test {
     fn test_with_future_trade() {
         let id = "id".to_string();
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
         let cost = calc_cost(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
