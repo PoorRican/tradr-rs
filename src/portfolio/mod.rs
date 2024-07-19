@@ -3,7 +3,6 @@ mod capital;
 mod position;
 mod tracked;
 mod trade;
-mod performance;
 mod risk;
 
 use std::collections::HashMap;
@@ -11,7 +10,6 @@ pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
 pub use position::PositionHandlers;
 pub use trade::TradeHandlers;
-pub use performance::PerformanceMetrics;
 
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;

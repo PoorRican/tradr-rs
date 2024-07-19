@@ -1,7 +1,7 @@
 use chrono::{DateTime};
 use polars::prelude::*;
 
-use crate::portfolio::{PerformanceMetrics, Portfolio, PortfolioArgs, PositionHandlers, TradeHandlers};
+use crate::portfolio::{Portfolio, PortfolioArgs, PositionHandlers, TradeHandlers};
 use crate::strategies::Strategy;
 use crate::types::{ExecutedTrade, FutureTrade, Side};
 use crate::utils;
@@ -19,7 +19,7 @@ impl BacktestingRunner {
         }
     }
 
-    pub fn run(&mut self, candles: &DataFrame) -> Result<PerformanceMetrics, ()> {
+    pub fn run(&mut self, candles: &DataFrame) -> Result<(), ()> {
         // process historical data
         self.strategy.bootstrap(candles);
 
@@ -73,7 +73,7 @@ impl BacktestingRunner {
                 println!("Open Positions: {:?}", portfolio.get_open_positions().unwrap());
 
                 // arbitrarily using a 3% risk-free rate
-                Ok(portfolio.calculate_performance_metrics(0.03).unwrap())
+                Ok(())
             } else {
                 // TODO: return err for no indicators
                 todo!()
