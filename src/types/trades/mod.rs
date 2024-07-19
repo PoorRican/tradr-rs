@@ -6,11 +6,10 @@ pub use executed::ExecutedTrade;
 pub use failed::FailedTrade;
 pub use future::FutureTrade;
 
-use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
 use chrono::NaiveDateTime;
 
-pub trait Trade: AsDataFrame {
+pub trait Trade {
     fn get_side(&self) -> Side;
     /// Get the price/rate of the traded asset
     fn get_price(&self) -> f64;

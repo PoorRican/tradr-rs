@@ -1,9 +1,7 @@
-use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
 use crate::types::trades::{calc_cost, Trade};
 use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
 
 /// Represents a trade that has been executed on the market
@@ -102,20 +100,6 @@ impl ExecutedTrade {
     }
 }
 
-impl AsDataFrame for ExecutedTrade {
-    fn as_dataframe(&self) -> DataFrame {
-        DataFrame::new(vec![
-            Series::new("id", vec![self.id.clone()]),
-            Series::new("side", vec![self.side as i8]),
-            Series::new("price", vec![self.price]),
-            Series::new("quantity", vec![self.quantity]),
-            Series::new("cost", vec![self.cost]),
-            Series::new("point", vec![self.point]),
-        ])
-        .unwrap()
-    }
-}
-
 impl Trade for ExecutedTrade {
     fn get_side(&self) -> Side {
         self.side
@@ -141,7 +125,6 @@ impl Trade for ExecutedTrade {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::traits::AsDataFrame;
     use crate::types::signals::Side;
     use crate::types::trades::calc_cost;
     use chrono::Utc;
@@ -204,87 +187,5 @@ mod test {
         assert_eq!(failed_trade.quantity, quantity);
         assert_eq!(failed_trade.cost, cost);
         assert_eq!(failed_trade.point, point);
-    }
-
-    #[test]
-    fn test_as_dataframe() {
-        let id = "id".to_string();
-        let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = 3.0;
-        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-
-        let trade = ExecutedTrade {
-            id: id.clone(),
-            side,
-            price,
-            quantity,
-            cost,
-            point,
-        };
-
-        let df = trade.as_dataframe();
-        assert_eq!(df.shape(), (1, 6));
-        assert_eq!(
-            df.get_column_names(),
-            &["id", "side", "price", "quantity", "cost", "point"]
-        );
-        assert_eq!(
-            df.column("side").unwrap().i8().unwrap().get(0).unwrap(),
-            side as i8
-        );
-        assert_eq!(
-            df.column("price").unwrap().f64().unwrap().get(0).unwrap(),
-            price
-        );
-        assert_eq!(
-            df.column("quantity")
-                .unwrap()
-                .f64()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-            quantity
-        );
-        assert_eq!(
-            df.column("cost").unwrap().f64().unwrap().get(0).unwrap(),
-            cost
-        );
-        assert_eq!(df.column("id").unwrap().str().unwrap().get(0).unwrap(), id);
-        assert_eq!(
-            df.column("point")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-            point.timestamp_millis()
-        );
-    }
-
-    #[test]
-    fn test_from_row() {
-        use polars::prelude::*;
-
-        let time = Utc::now().naive_utc();
-
-        let row = df![
-            "id" => ["id"],
-            "side" => [Side::Buy as i8],
-            "price" => [1.0],
-            "quantity" => [2.0],
-            "cost" => [3.0],
-            "point" => [time]
-        ]
-        .unwrap();
-        let trade = ExecutedTrade::from_row(&row);
-
-        assert_eq!(trade.id, "id");
-        assert_eq!(trade.side, Side::Buy);
-        assert_eq!(trade.price, 1.0);
-        assert_eq!(trade.quantity, 2.0);
-        assert_eq!(trade.cost, 3.0);
-        assert_eq!(trade.point.timestamp_millis(), time.timestamp_millis());
     }
 }

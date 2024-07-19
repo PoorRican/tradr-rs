@@ -5,6 +5,7 @@
 ### Code Changes
 
 - Remove `Engine`. This will be replaced with an updated implementation in the future.
+- Remove `AsDataFrame` trait-bound from `Trade`. Removed implementations from `ExecutedTrade`, `FutureTrade`, and `Trade`.
 
 ### Portfolio Improvements
 
