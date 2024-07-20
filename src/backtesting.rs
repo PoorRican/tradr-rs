@@ -70,7 +70,7 @@ impl BacktestingRunner {
 
                 println!("Trades: {:?}", portfolio.get_executed_trades());
 
-                println!("Open Positions: {:?}", portfolio.get_open_positions().unwrap());
+                println!("Open Positions: {:?}", portfolio.get_open_positions_as_trades().unwrap());
 
                 // arbitrarily using a 3% risk-free rate
                 Ok(())

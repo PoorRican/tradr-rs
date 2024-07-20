@@ -1,390 +1,309 @@
-use crate::portfolio::Portfolio;
+use std::collections::BTreeMap;
+use crate::portfolio::{OpenPosition, Portfolio};
 use crate::types::Side;
 use crate::types::{ExecutedTrade, Trade};
 use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
 use polars::prelude::*;
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
+/// Tracking and management of open positions
 pub trait PositionHandlers {
     fn add_open_position(&mut self, trade: &ExecutedTrade);
 
-    fn get_open_positions(&self) -> Option<Vec<&ExecutedTrade>>;
-
-    fn select_open_positions_by_price(&self, price: Decimal) -> Option<Vec<&ExecutedTrade>>;
-    fn available_open_positions(&self) -> usize;
-    fn clear_open_positions(&mut self, executed_trade: &ExecutedTrade);
+    fn get_open_positions_as_trades(&self) -> Option<Vec<&ExecutedTrade>>;
+    fn get_open_positions(&self) -> &BTreeMap<NaiveDateTime, OpenPosition>;
+    fn close_positions(&mut self, quantity: Decimal, close_price: Decimal) -> Vec<String>;
+    fn update_position_metrics(&mut self);
+    fn total_open_quantity(&self) -> Decimal;
+    fn average_entry_price(&self) -> Decimal;
+    fn total_position_value(&self) -> Decimal;
 }
 
 impl PositionHandlers for Portfolio {
     /// Add provided trade as an open position
     ///
     /// This is intended to be called after a buy trade has been executed. The timestamp of the
-    /// executed trade is added to the `open_positions` vector. The timestamp is used to track
-    /// and the timestamp is removed from the `open_positions` vector by the `clear_open_positions`
-    /// method which uses `select_open_positions` to select open positions that were closed.
+    /// executed trade is added to the `open_positions` map. The timestamp is used to track
     ///
-    /// # Arguments
-    /// * `trade` - The executed trade to add. Only buy trades are added. Sell trades are ignored.
+    /// # Panics
+    ///
+    /// Will not accept sell trades
     fn add_open_position(&mut self, trade: &ExecutedTrade) {
-        if trade.get_side() == Side::Buy {
-            self.open_positions.push(*trade.get_timestamp());
+        if trade.get_side() == Side::Sell {
+            // TODO: return an err instead
+            panic!("Attempted to add a sell trade as an open position");
         }
+
+        let position = OpenPosition {
+            entry_price: trade.get_price(),
+            quantity: trade.get_quantity(),
+            entry_time: *trade.get_timestamp(),
+            order_id: trade.get_order_id().to_string(),
+        };
+
+        self.open_positions.insert(*trade.get_timestamp(), position);
+        self.update_position_metrics();
     }
 
     /// Returns a [`Vec`] with references to the executed trades that correspond to open positions.
     ///
     /// If there are no open positions, `None` is returned.
-    fn get_open_positions(&self) -> Option<Vec<&ExecutedTrade>> {
+    fn get_open_positions_as_trades(&self) -> Option<Vec<&ExecutedTrade>> {
         if self.open_positions.is_empty() {
             return None;
         }
 
-        Some(self.open_positions
-            .iter().map(
+        Some(self.open_positions.keys()
+            .map(
                 |x| self.executed_trades.get(x).unwrap()
             ).collect::<Vec<_>>())
     }
 
-    /// Select open positions that are less than the given `price` which may be profitable.
+    fn get_open_positions(&self) -> &BTreeMap<NaiveDateTime, OpenPosition> {
+        &self.open_positions
+    }
+
+    /// Close open positions by quantity and close price
     ///
-    /// `None` is returned if there are no open positions or no open positions that are less than price.
-    fn select_open_positions_by_price(&self, price: Decimal) -> Option<Vec<&ExecutedTrade>> {
-        if self.open_positions.is_empty() {
-            return None;
+    /// First, profitable positions are closed first, from most-profitable to least. Then, non-profitable positions are
+    /// closed in a FIFO order.
+    ///
+    /// Returns the order ids of the fully closed positions.
+    fn close_positions(&mut self, quantity: Decimal, close_price: Decimal) -> Vec<String> {
+        let mut remaining_quantity = quantity;
+        let mut closed_trade_ids = Vec::new();
+        let mut positions_to_remove = Vec::new();
+        let mut positions_to_update = Vec::new();
+
+        // Sort positions by profitability (most profitable first)
+        let mut sorted_positions: Vec<_> = self.open_positions.iter().collect();
+        sorted_positions.sort_by(|a, b| {
+            let profit_a = close_price - a.1.entry_price;
+            let profit_b = close_price - b.1.entry_price;
+            profit_b.partial_cmp(&profit_a).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        for (timestamp, position) in sorted_positions {
+            if remaining_quantity <= Decimal::ZERO {
+                break;
+            }
+
+            if position.quantity <= remaining_quantity {
+                remaining_quantity -= position.quantity;
+                closed_trade_ids.push(position.order_id.clone());
+                positions_to_remove.push(*timestamp);
+            } else {
+                let new_quantity = position.quantity - remaining_quantity;
+                positions_to_update.push((*timestamp, new_quantity));
+                remaining_quantity = Decimal::ZERO;
+            }
         }
 
-        let selected = self.open_positions.iter().map(
-                |x| self.executed_trades.get(x).unwrap()
-            ).filter(|x| x.get_price() <= price).collect::<Vec<_>>();
+        // Remove fully closed positions
+        for timestamp in positions_to_remove {
+            self.open_positions.remove(&timestamp);
+        }
 
-        if selected.is_empty() {
-            None
+        // Update partially closed positions
+        for (timestamp, new_quantity) in positions_to_update {
+            if let Some(position) = self.open_positions.get_mut(&timestamp) {
+                position.quantity = new_quantity;
+            }
+        }
+
+        self.update_position_metrics();
+        closed_trade_ids
+    }
+
+    /// Update the average entry price and total notional value of open positions
+    fn update_position_metrics(&mut self) {
+        let (total_value, total_cost, total_quantity) = self.open_positions.values()
+            .fold((Decimal::ZERO, Decimal::ZERO, Decimal::ZERO), |acc, position| {
+                (
+                    acc.0 + position.quantity * position.entry_price,
+                    acc.1 + position.quantity * position.entry_price,
+                    acc.2 + position.quantity
+                )
+            });
+
+        self.total_position_notional_value = total_value;
+        self.average_entry_price = if total_quantity.is_zero() {
+            Decimal::ZERO
         } else {
-            Some(selected)
-        }
+            total_cost / total_quantity
+        };
     }
 
-    /// Return the number of available open positions
-    ///
-    /// This is used for limiting risk buy preventing too many open positions.
-    /// The intention is to prevent any buy trades from being executed if there are too many open positions.
-    /// Therefore, when this value is 0, no buy trades should be attempted.
-    fn available_open_positions(&self) -> usize {
-        self.open_positions_limit - self.open_positions.len()
+    /// Total quantity of open positions
+    fn total_open_quantity(&self) -> Decimal {
+        self.open_positions.values().map(|p| p.quantity).sum()
     }
 
-    /// Clear the open positions that were closed by the executed trade
-    ///
-    /// This is intended to be called after a sell trade has been executed.
-    ///
-    /// Clearing of open positions is totally dependent on the price/rate of the
-    /// executed trade. The amount of trade is not taken into consideration because it
-    /// is assumed that the entire open position was closed. Additionally, the executed trade
-    /// passed is not to have required to have closed any open positions. The method
-    /// `select_open_positions` is relied upon to select open positions both by this method
-    /// and before the executed trade is attempted.
-    ///
-    /// # Arguments
-    /// * `executed_trade` - The executed trade that may have closed any open positions
-    fn clear_open_positions(&mut self, executed_trade: &ExecutedTrade) {
-        if executed_trade.get_side() != Side::Sell {
-            return;
-        }
+    /// Average entry price of open positions
+    fn average_entry_price(&self) -> Decimal {
+        self.average_entry_price
+    }
 
-        // TODO: there needs to be a better way to handle how positions are closed
-        let open_positions = self.select_open_positions_by_price(executed_trade.get_price());
-
-        if let Some(open_positions) = open_positions {
-            // get the timestamps of the open positions
-            let open_positions_points = open_positions
-                .iter()
-                .map(|x| x.get_timestamp())
-                .collect::<Vec<_>>();
-
-            // remove the timestamps of the open positions that were closed by the executed trade
-            self.open_positions = self
-                .open_positions
-                .iter()
-                .filter(|x| !open_positions_points.contains(x))
-                .map(|x| *x)
-                .collect();
-        }
+    /// Total notional value of open positions
+    fn total_position_value(&self) -> Decimal {
+        self.total_position_notional_value
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::portfolio::{Portfolio, PositionHandlers, TradeHandlers};
-    use crate::types::{ExecutedTrade, Side, Trade};
-    use chrono::{Duration, NaiveDateTime, Utc};
-    use rust_decimal::Decimal;
-    use rust_decimal::prelude::FromPrimitive;
-    use rust_decimal_macros::dec;
+    use super::*;
+    use chrono::{NaiveDate, NaiveTime};
 
-    /// Test that open positions are correctly added to the `open_positions` vector.
-    /// Also ensure that closed positions are not added to the `open_positions` vector.
+    fn create_executed_trade(id: &str, side: Side, price: Decimal, quantity: Decimal, timestamp: NaiveDateTime) -> ExecutedTrade {
+        ExecutedTrade::with_calculated_notional(id.to_string(), side, price, quantity, timestamp)
+    }
+
     #[test]
-    fn test_set_as_open_position() {
-        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+    fn test_add_open_position() {
+        let mut portfolio = Portfolio::default();
+        let timestamp = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let trade = create_executed_trade("1", Side::Buy, dec!(100), dec!(10), timestamp);
 
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-
-        assert!(portfolio.open_positions.is_empty());
-
-        // add a buy and assert it is added to `open_positions`
-        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
         portfolio.add_open_position(&trade);
+
+        assert_eq!(portfolio.open_positions.len(), 1);
+        assert_eq!(portfolio.total_position_notional_value, dec!(1000)); // 100 * 10
+        assert_eq!(portfolio.average_entry_price, dec!(100));
+
+        let position = portfolio.open_positions.get(&timestamp).unwrap();
+        assert_eq!(position.entry_price, dec!(100));
+        assert_eq!(position.quantity, dec!(10));
+        assert_eq!(position.entry_time, timestamp);
+        assert_eq!(position.order_id, "1");
+    }
+
+    #[test]
+    fn test_update_position_metrics() {
+        let mut portfolio = Portfolio::default();
+        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+
+        portfolio.open_positions.insert(timestamp1, OpenPosition {
+            entry_price: dec!(100),
+            quantity: dec!(10),
+            entry_time: timestamp1,
+            order_id: "1".to_string(),
+        });
+        portfolio.open_positions.insert(timestamp2, OpenPosition {
+            entry_price: dec!(110),
+            quantity: dec!(5),
+            entry_time: timestamp2,
+            order_id: "2".to_string(),
+        });
+
+        portfolio.update_position_metrics();
+
+        assert_eq!(portfolio.total_position_notional_value, dec!(1550)); // (100 * 10) + (110 * 5)
+        assert!(portfolio.average_entry_price > dec!(103.3333) && portfolio.average_entry_price < dec!(103.3334)); // (1000 + 550) / 15
+    }
+
+    #[test]
+    fn test_close_positions() {
+        let mut portfolio = Portfolio::default();
+        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp3 = NaiveDate::from_ymd_opt(2023, 1, 3).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+
+        portfolio.open_positions.insert(timestamp1, OpenPosition {
+            entry_price: dec!(100),
+            quantity: dec!(10),
+            entry_time: timestamp1,
+            order_id: "1".to_string(),
+        });
+        portfolio.open_positions.insert(timestamp2, OpenPosition {
+            entry_price: dec!(110),
+            quantity: dec!(5),
+            entry_time: timestamp2,
+            order_id: "2".to_string(),
+        });
+        portfolio.open_positions.insert(timestamp3, OpenPosition {
+            entry_price: dec!(90),
+            quantity: dec!(8),
+            entry_time: timestamp3,
+            order_id: "3".to_string(),
+        });
+
+        portfolio.update_position_metrics();
+
+        // Close some positions
+        let closed_trade_ids = portfolio.close_positions(dec!(18), dec!(120));
+
+        // Check that the most profitable positions were closed first
+        assert_eq!(closed_trade_ids, vec!["3".to_string(), "1".to_string()]);
         assert_eq!(portfolio.open_positions.len(), 1);
 
-        // add a sell and assert it is *not* added to `open_positions`
-        let trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Sell,
-            dec!(1.0),
-            dec!(1.0),
-            time + Duration::minutes(1),
-        );
-        portfolio.add_open_position(&trade);
+        let remaining_position = portfolio.open_positions.get(&timestamp2).unwrap();
+        assert_eq!(remaining_position.quantity, dec!(5)); // 8 - (18 - 15) = 5
+
+        assert_eq!(portfolio.total_position_notional_value, dec!(550)); // 110 * 5
+        assert_eq!(portfolio.average_entry_price, dec!(110));
+    }
+
+    #[test]
+    fn test_close_positions_partial() {
+        let mut portfolio = Portfolio::default();
+        let timestamp = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+
+        portfolio.open_positions.insert(timestamp, OpenPosition {
+            entry_price: dec!(100),
+            quantity: dec!(10),
+            entry_time: timestamp,
+            order_id: "1".to_string(),
+        });
+
+        portfolio.update_position_metrics();
+
+        // Partially close the position
+        let closed_trade_ids = portfolio.close_positions(dec!(6), dec!(120));
+
+        assert!(closed_trade_ids.is_empty()); // No trades fully closed
         assert_eq!(portfolio.open_positions.len(), 1);
 
-        // add another buy and assert it is added to `open_positions`
-        let time2 = time + Duration::minutes(2);
-        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time2);
-        portfolio.add_open_position(&trade);
-        assert_eq!(portfolio.open_positions.len(), 2);
+        let remaining_position = portfolio.open_positions.get(&timestamp).unwrap();
+        assert_eq!(remaining_position.quantity, dec!(4));
 
-        // ensure that the time values are correct in `open_positions`
-        assert!(portfolio.open_positions.contains(&time));
-        assert!(portfolio.open_positions.contains(&time2));
+        assert_eq!(portfolio.total_position_notional_value, dec!(400)); // 100 * 4
+        assert_eq!(portfolio.average_entry_price, dec!(100));
     }
 
     #[test]
-    fn test_get_open_positions() {
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        assert_eq!(portfolio.get_open_positions(), None);
+    fn test_close_positions_multiple_partial() {
+        let mut portfolio = Portfolio::default();
+        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
 
-        // create some executed trades
-        // only `trade` and `trade3` should be returned by `get_open_positions`
-        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
-        let trade2 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.5),
-            dec!(0.9),
-            time + Duration::seconds(1),
-        );
-        let trade3 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.7),
-            dec!(1.5),
-            time + Duration::seconds(2),
-        );
+        portfolio.open_positions.insert(timestamp1, OpenPosition {
+            entry_price: dec!(100),
+            quantity: dec!(10),
+            entry_time: timestamp1,
+            order_id: "1".to_string(),
+        });
+        portfolio.open_positions.insert(timestamp2, OpenPosition {
+            entry_price: dec!(110),
+            quantity: dec!(5),
+            entry_time: timestamp2,
+            order_id: "2".to_string(),
+        });
 
-        portfolio.add_executed_trade(trade);
-        portfolio.add_executed_trade(trade2);
-        portfolio.add_executed_trade(trade3);
+        portfolio.update_position_metrics();
 
-        // assert that the dataframe returned by `get_open_positions` corresponds to open trades
-        assert_eq!(portfolio.get_open_positions().unwrap().len(), 3);
+        // Close more than one position, but not all
+        let closed_trade_ids = portfolio.close_positions(dec!(12), dec!(120));
 
-        let expected_price_sum = Decimal::from_f64(1.0 + 1.5 + 1.7).unwrap();
-        let expected_quantity_sum = Decimal::from_f64(1.0 + 0.9 + 1.5).unwrap();
-
-        let open_positions = portfolio.get_open_positions().unwrap();
-        assert_eq!(
-            open_positions
-                .iter().map(|x| x.get_quantity())
-                .sum::<Decimal>(),
-            expected_quantity_sum
-        );
-        assert_eq!(
-            open_positions
-                .iter().map(|x| x.get_price())
-                .sum::<Decimal>(),
-            expected_price_sum
-        );
-    }
-
-    #[test]
-    fn test_select_open_positions() {
-        let time = Utc::now().naive_utc();
-        let trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(2.0),
-            dec!(1.0),
-            time + Duration::seconds(1),
-        );
-        let trade2 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.9),
-            dec!(1.0),
-            time + Duration::seconds(2),
-        );
-        let trade3 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.8),
-            dec!(1.0),
-            time + Duration::seconds(3),
-        );
-        let trade4 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.0),
-            dec!(1.0),
-            time + Duration::seconds(4),
-        );
-        let trade5 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(0.1),
-            dec!(1.0),
-            time + Duration::seconds(5),
-        );
-
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-
-        // assert that `None` is returned when there are no open positions
-        assert_eq!(portfolio.select_open_positions_by_price(dec!(1.0)), None);
-
-        // add trades to `executed_trades`
-        portfolio.add_executed_trade(trade);
-        portfolio.add_executed_trade(trade2);
-        portfolio.add_executed_trade(trade3);
-        portfolio.add_executed_trade(trade4);
-        portfolio.add_executed_trade(trade5);
-
-        // remove last trade from `open_positions`
-        portfolio.open_positions.pop();
-
-        // assert that `None` is returned when price is 0.9
-        let selected_open_positions = portfolio.select_open_positions_by_price(dec!(0.9));
-        assert_eq!(selected_open_positions, None);
-
-        // assert that the correct number of open positions are returned
-        // we will be selecting trades that are less than 1.9
-        // therefore only `trade2`, `trade3`, and `trade4` should be returned
-        let selected_open_positions = portfolio.select_open_positions_by_price(dec!(1.9)).unwrap();
-
-        assert_eq!(selected_open_positions.len(), 3);
-        assert_eq!(
-            selected_open_positions
-                .iter().map(|x| x.get_price())
-                .sum::<Decimal>(),
-            Decimal::from_f64(1.9 + 1.8 + 1.0).unwrap()
-        );
-        assert_eq!(
-            selected_open_positions
-                .iter().map(|x| x.get_quantity())
-                .sum::<Decimal>(),
-            Decimal::from_f64(1.0 * 3.0).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_available_open_positions() {
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-
-        // assert that `available_open_positions` is maxed when there are no open positions
-        portfolio.open_positions_limit = 10;
-        assert_eq!(portfolio.available_open_positions(), 10);
-
-        // assert that `available_open_positions` is correctly decremented when an open positions are added
-        portfolio
-            .open_positions
-            .push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
-        assert_eq!(portfolio.available_open_positions(), 9);
-
-        portfolio
-            .open_positions
-            .push(NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
-        assert_eq!(portfolio.available_open_positions(), 8);
-
-        // assert that `available_open_positions` is 0 when `open_positions_limit` is reached
-        portfolio.open_positions_limit = 2;
-        assert_eq!(portfolio.available_open_positions(), 0);
-    }
-
-    #[test]
-    fn test_clear_open_positions() {
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-
-        // create some open positions with varying prices
-        let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(2.0),
-            dec!(1.0),
-            time + Duration::seconds(1),
-        );
-        let trade2 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.9),
-            dec!(1.0),
-            time + Duration::seconds(2),
-        );
-        let trade3 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.8),
-            dec!(1.0),
-            time + Duration::seconds(3),
-        );
-        let trade4 = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(1.0),
-            dec!(1.0),
-            time + Duration::seconds(4),
-        );
-
-        // add trades to `executed_trades`
-        portfolio.add_executed_trade(trade);
-        portfolio.add_executed_trade(trade2);
-        portfolio.add_executed_trade(trade3);
-        portfolio.add_executed_trade(trade4);
-
-        assert_eq!(portfolio.open_positions.len(), 4);
-
-        // remove the lowest buy
-        let executed_trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Sell,
-            dec!(1.1),
-            dec!(1.0),
-            time + Duration::seconds(5),
-        );
-        portfolio.clear_open_positions(&executed_trade);
-        assert_eq!(portfolio.open_positions.len(), 3);
-
-        // assert that 2/3 of the remaining positions are cleared when price is 1.9
-        let executed_trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Sell,
-            dec!(1.9),
-            dec!(1.0),
-            time + Duration::seconds(6),
-        );
-        portfolio.clear_open_positions(&executed_trade);
+        assert_eq!(closed_trade_ids, vec!["1".to_string()]); // Only the first trade is fully closed
         assert_eq!(portfolio.open_positions.len(), 1);
-        assert_eq!(portfolio.open_positions[0], time + Duration::seconds(1));
 
-        // assert that all positions are cleared when price is 2.0
-        let executed_trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Sell,
-            dec!(2.0),
-            dec!(1.0),
-            time + Duration::seconds(6),
-        );
-        portfolio.clear_open_positions(&executed_trade);
-        assert!(portfolio.open_positions.is_empty());
+        let remaining_position = portfolio.open_positions.get(&timestamp2).unwrap();
+        assert_eq!(remaining_position.quantity, dec!(3)); // 10 - (12 - 5) = 3
+
+        assert_eq!(portfolio.total_position_notional_value, dec!(330)); // 110 * 3
+        assert_eq!(portfolio.average_entry_price, dec!(110));
     }
 }

@@ -17,6 +17,8 @@
 
 - Remove all internal of `DataFrame`. Instead, `Vec` and `HashMap` are used to store data.
 - Add risk functions to `Portfolio`
+- Improve open position tracking. Create an `OpenPosition` struct to track open positions,
+  and add attributes to `Portfolio` to track open position metrics.
 
 ---
 

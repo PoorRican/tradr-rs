@@ -58,7 +58,7 @@ fn calculate_position_metrics(portfolio: &Portfolio, current_price: Decimal) -> 
     let mut total_cost = dec!(0);
     let mut total_quantity = dec!(0);
 
-    for trade in portfolio.get_open_positions().unwrap().iter() {
+    for trade in portfolio.get_open_positions_as_trades().unwrap().iter() {
         let quantity = trade.get_quantity();
         let cost = trade.get_notional_value();
 
@@ -144,55 +144,6 @@ fn calculate_returns(candles: &[Candle]) -> Vec<Decimal> {
 }
 
 
-/// Risk metrics for a portfolio
-///
-/// # Measurements
-///
-/// These are the more complex risk metrics returned.
-///
-/// ## Value at Risk (VaR)
-///
-/// Quantifies the level of financial risk over a specific time frame with a given confidence interval.
-///
-/// For example, a 95% confidence interval, means that there is a 5% chance that the portfolio will
-/// lose more than the VaR estimate over the defined period.
-///
-///
-/// ## Beta
-///
-/// Measures the correlation and volatility between the asset and the market.
-///
-/// ### Interpretation
-///
-/// - 1: The asset moves in line with the market.
-/// - > 1: The asset is more volatile than the market.
-/// - < 1: The asset is less volatile than the market.
-/// - = 0: The asset's returns have no correlation with the market.
-/// - Negative: The asset tends to move in the opposite direction of the market.
-///
-///
-/// ## Sharpe Ratio
-///
-/// Measures the additional return for the volatility endured for holding a riskier asset.
-///
-/// ### Interpretation
-///
-/// - > 1: The asset is generating a return above the risk-free rate for the volatility endured.
-/// - < 1: The asset is generating a return below the risk-free rate for the volatility endured.
-///
-/// ### Uses
-///
-/// - **Assessing Strategies:** a strategy with a higher Sharpe ratio is generally considered
-///   better as it provides more return for the same amount of risk.
-/// - **Risk Management:** Aids in understanding if the returns of a strategy justify the risk it's
-///   taking. Crucial for maintaining a balanced risk profile in algorithmic trading.
-/// - **Performance Metric:** Evaluates the performance of algorithms over time.
-/// - **Strategy Optimization:** Can be used as an optimization target, adjusting trading parameters to
-///   maximize the Sharpe ratio, aiming for the best risk-adjusted returns.
-/// - **Capital Allocation:** In a system with multiple trading strategies, the Sharpe ratio can guide capital
-///   allocation/distribution. Strategies with higher Sharpe ratios might receive more capital.
-/// - **Robustness Check:** A consistently high Sharpe ratio across different market conditions can indicate
-/// a robust trading strategy.
 pub struct PortfolioRisk {
     pub total_position_value: Decimal,
     pub average_entry_price: Decimal,

@@ -57,35 +57,13 @@ impl TradeHandlers for Portfolio {
         } else {
             self.increase_capital(trade.get_notional_value(), *trade.get_timestamp());
             self.decrease_assets(trade.get_quantity(), *trade.get_timestamp());
-            self.clear_open_positions(&trade);
+            self.close_positions(trade.get_quantity(), trade.get_notional_value());
         }
         self.executed_trades.insert(*trade.get_timestamp(), trade);
     }
 
     fn generate_sell_opt(&self, candle: &Candle) -> Option<FutureTrade> {
-        let rate = calculate_sell_rate(candle);
-        let viable_positions = self.select_open_positions_by_price(rate);
-
-        if let Some(positions) = viable_positions {
-            // the total quantity of assets to be sold
-            let quantity = positions.iter().map(|x| x.get_quantity()).sum();
-
-            // the total cost at which the assets were purchased
-            let cost: Decimal = positions.iter().map(|x| x.get_notional_value()).sum();
-
-            // calculate the value of the assets at the proposed rate
-            let sell_value = match self.fee_calculator {
-                Some(ref fee_calculator) => {
-                    fee_calculator.cost_including_fee(quantity * rate, Side::Sell)
-                }
-                None => quantity * rate,
-            };
-            let profit = sell_value - cost;
-            if profit > self.threshold {
-                return Some(FutureTrade::new(Side::Sell, rate, quantity, candle.time));
-            }
-        }
-        None
+        todo!()
     }
 
     fn generate_buy_opt(&self, candle: &Candle) -> Option<FutureTrade> {
@@ -102,7 +80,7 @@ impl TradeHandlers for Portfolio {
     ///
     /// This number is determined by the amount of capital available and the number of open positions.
     fn get_buy_cost(&self) -> Decimal {
-        self.available_capital() / Decimal::from(self.available_open_positions())
+        todo!()
     }
 
     /// Get the most recent trade
@@ -135,22 +113,7 @@ impl TradeHandlers for Portfolio {
     /// `true` if the portfolio is able to buy, `false` otherwise
     ///
     fn able_to_buy(&self) -> bool {
-        if self.available_open_positions() == 0 {
-            return false;
-        } else {
-            // check the last trade
-            let last_trade = self.get_last_trade();
-            if let Some(trade) = last_trade {
-                if trade.get_side() == Side::Buy {
-                    // check timeout
-                    let now = Utc::now().naive_utc();
-                    let diff = now - *trade.get_timestamp();
-                    return if diff >= self.timeout { true } else { false };
-                }
-            }
-            // if there was no last trade, or if the last trade was a sell, then we are able to buy
-            true
-        }
+        todo!()
     }
 }
 
@@ -279,51 +242,5 @@ mod tests {
             last_trade.get_timestamp().timestamp_millis(),
             time.timestamp_millis()
         );
-    }
-
-    #[test]
-    fn test_able_to_buy() {
-        // test that we are able to buy when there are no open positions
-        let portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        assert!(portfolio.able_to_buy());
-
-        // test that we are able to buy if the last trade is a sell
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        let trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Sell,
-            dec!(100.0),
-            dec!(1.0),
-            Utc::now().naive_utc(),
-        );
-        portfolio.add_executed_trade(trade);
-
-        assert!(portfolio.able_to_buy());
-
-        // test that we are not able to buy if the last trade is a buy and the timeout has not expired
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        let trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(100.0),
-            dec!(1.0),
-            Utc::now().naive_utc(),
-        );
-        portfolio.add_executed_trade(trade);
-
-        assert!(!portfolio.able_to_buy());
-
-        // test hat we are able to buy if the last trade is a buy and the timeout has expired
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        let trade = ExecutedTrade::with_calculated_notional(
-            "id".to_string(),
-            Side::Buy,
-            dec!(100.0),
-            dec!(1.0),
-            Utc::now().naive_utc() - portfolio.timeout,
-        );
-        portfolio.add_executed_trade(trade);
-
-        assert!(portfolio.able_to_buy());
     }
 }

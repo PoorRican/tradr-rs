@@ -4,7 +4,7 @@ mod position;
 mod tracked;
 mod trade;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
 pub use position::PositionHandlers;
@@ -15,6 +15,7 @@ use crate::portfolio::tracked::TrackedValue;
 use chrono::{Duration, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use ta::Open;
 use crate::types::{ExecutedTrade, FailedTrade};
 
 pub const DEFAULT_LIMIT: usize = 4;
@@ -61,8 +62,6 @@ pub struct PortfolioArgs {
     pub assets: Decimal,
     pub capital: Decimal,
     pub threshold: Decimal,
-    pub open_positions_limit: usize,
-    pub timeout: i64,
 }
 impl Default for PortfolioArgs {
     fn default() -> Self {
@@ -70,10 +69,16 @@ impl Default for PortfolioArgs {
             assets: dec!(0.0),
             capital: dec!(100.0),
             threshold: DEFAULT_THRESHOLD,
-            open_positions_limit: DEFAULT_LIMIT,
-            timeout: DEFAULT_TIMEOUT_MINUTES,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenPosition {
+    pub entry_price: Decimal,
+    pub quantity: Decimal,
+    pub entry_time: NaiveDateTime,
+    pub order_id: String,
 }
 
 /// This struct is used to manage an entire portfolio for a given asset.
@@ -83,13 +88,14 @@ impl Default for PortfolioArgs {
 pub struct Portfolio {
     failed_trades: Vec<FailedTrade>,
     executed_trades: HashMap<NaiveDateTime, ExecutedTrade>,
-    open_positions: Vec<NaiveDateTime>,
+    open_positions: BTreeMap<NaiveDateTime, OpenPosition>,
 
     threshold: Decimal,
     assets_ts: TrackedValue,
     capital_ts: TrackedValue,
-    open_positions_limit: usize,
-    timeout: Duration,
+
+    total_position_notional_value: Decimal,
+    average_entry_price: Decimal,
 
     fee_calculator: Option<Box<dyn FeeCalculator>>,
 }
@@ -99,13 +105,15 @@ impl Default for Portfolio {
         Self {
             failed_trades: vec![],
             executed_trades: HashMap::new(),
-            open_positions: vec![],
+            open_positions: BTreeMap::new(),
 
             threshold: DEFAULT_THRESHOLD,
             assets_ts: TrackedValue::default(),
             capital_ts: TrackedValue::default(),
-            open_positions_limit: DEFAULT_LIMIT,
-            timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
+
+            total_position_notional_value: dec!(0),
+            average_entry_price: dec!(0),
+
             fee_calculator: None,
         }
     }
@@ -133,8 +141,6 @@ impl Portfolio {
             threshold: args.threshold,
             assets_ts: TrackedValue::with_initial(args.assets, start_time),
             capital_ts: TrackedValue::with_initial(args.capital, start_time),
-            open_positions_limit: args.open_positions_limit,
-            timeout: Duration::minutes(args.timeout),
             fee_calculator: None,
             ..Default::default()
         }
@@ -144,21 +150,21 @@ impl Portfolio {
     pub fn with_data(
         failed_trades: Vec<FailedTrade>,
         executed_trades: HashMap<NaiveDateTime, ExecutedTrade>,
-        open_positions: Vec<NaiveDateTime>,
+        open_positions: BTreeMap<NaiveDateTime, OpenPosition>,
         assets_ts: TrackedValue,
         capital_ts: TrackedValue,
     ) -> Portfolio {
-        Portfolio {
+        let mut portfolio = Portfolio {
             failed_trades,
             executed_trades,
             open_positions,
-            threshold: DEFAULT_THRESHOLD,
             assets_ts,
             capital_ts,
-            open_positions_limit: DEFAULT_LIMIT,
-            timeout: Duration::minutes(DEFAULT_TIMEOUT_MINUTES),
             fee_calculator: None,
-        }
+            ..Self::default()
+        };
+        portfolio.update_position_metrics();
+        portfolio
     }
 
     /// Builder method for the `fee_calculator` field
@@ -176,25 +182,6 @@ impl Portfolio {
     /// * `threshold` - The new profitability threshold in unit currency
     pub fn set_threshold(&mut self, threshold: Decimal) {
         self.threshold = threshold;
-    }
-
-    /// Setter for the open positions limit parameter
-    ///
-    /// This is used by `Portfolio::available_open_positions()` to determine the number of
-    /// available open positions at any given time.
-    ///
-    /// # Arguments
-    /// * `limit` - The number of open positions allowed at any given time
-    pub fn set_open_positions_limit(&mut self, limit: usize) {
-        self.open_positions_limit = limit;
-    }
-
-    /// Setter for the open positions timeout parameter
-    ///
-    /// # Arguments
-    /// * `minute` - The number of minutes after which an open position is closed
-    pub fn set_timeout(&mut self, minute: usize) {
-        self.timeout = Duration::minutes(minute as i64);
     }
 }
 
@@ -235,11 +222,6 @@ mod tests {
 
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
-        assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
-        assert_eq!(
-            portfolio.timeout,
-            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
-        );
 
         // assert that the trade storage is empty
         assert_eq!(portfolio.executed_trades.len(), 1);
@@ -263,11 +245,6 @@ mod tests {
 
         // assert that the default parameters are set correctly
         assert_eq!(portfolio.threshold, DEFAULT_THRESHOLD);
-        assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
-        assert_eq!(
-            portfolio.timeout,
-            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
-        );
 
         // assert that the trade storage is empty
         assert!(portfolio.failed_trades.is_empty());
@@ -293,26 +270,4 @@ mod tests {
         portfolio.set_threshold(dec!(0.25));
         assert_eq!(portfolio.threshold, dec!(0.25));
     }
-
-    #[test]
-    fn test_set_open_positions_limit() {
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        assert_eq!(portfolio.open_positions_limit, DEFAULT_LIMIT);
-
-        portfolio.set_open_positions_limit(2);
-        assert_eq!(portfolio.open_positions_limit, 2);
-    }
-
-    #[test]
-    fn test_set_timeout() {
-        let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        assert_eq!(
-            portfolio.timeout,
-            Duration::minutes(DEFAULT_TIMEOUT_MINUTES)
-        );
-
-        portfolio.set_timeout(10);
-        assert_eq!(portfolio.timeout, Duration::minutes(10));
-    }
-
 }
