@@ -2,8 +2,6 @@ use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
 use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
-use polars::prelude::{NamedFrom, Series};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
@@ -31,13 +29,13 @@ impl FutureTrade {
         }
     }
 
-    pub fn new_from_cost(side: Side, price: f64, cost: f64, point: NaiveDateTime) -> FutureTrade {
+    pub fn new_with_calculate_nominal(side: Side, price: Decimal, cost: Decimal, point: NaiveDateTime) -> FutureTrade {
         let quantity = cost / price;
         FutureTrade {
             side,
-            price: Decimal::from_f64(price).unwrap(),
-            quantity: Decimal::from_f64(quantity).unwrap(),
-            cost: Decimal::from_f64(cost).unwrap(),
+            price,
+            quantity,
+            cost,
             point,
         }
     }

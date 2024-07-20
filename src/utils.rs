@@ -97,6 +97,18 @@ pub fn extract_candles_from_df(df: &DataFrame) -> PolarsResult<Vec<Candle>> {
     ).collect())
 }
 
+pub fn extract_signals_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<Vec<Signal>> {
+    Ok(df.column(column_name)?.i8()?
+        .into_iter()
+        .map(|value| {
+            if let Some(value) = value {
+                return Signal::from(value);
+            } else {
+                return Signal::Hold;
+            }
+        }).collect())
+}
+
 pub fn extract_side_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<Vec<Side>> {
     Ok(df.column(column_name)?.i8()?
         .into_iter()

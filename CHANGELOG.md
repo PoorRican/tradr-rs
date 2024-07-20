@@ -9,7 +9,7 @@
 - Implement `Decimal` as the floating-point type for `Trade`, `Candle`, and `Portfolio`.
 - Move risk assessment functionality from `Portfolio` to a dedicated module. It is now a standalone function.
   Added documentation to the `PortfolioRisk` struct to explain the complex metrics.
-- Created a `PositionManager` for handling trade decisions. It has not been implemented yet.
+- Created a `PositionManager` for handling trade decisions.
 - Added `thiserror` and `log` crates
 - Updated `Trade` and `ExecutedTrade` to use better nomenclature for trade types.
 
