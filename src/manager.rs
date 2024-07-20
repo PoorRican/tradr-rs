@@ -82,8 +82,8 @@ impl<'a> PositionManager<'a> {
         let open_positions = self.portfolio.get_open_positions().unwrap();
 
         for position in open_positions {
-            let stop_loss = position.get_cost() * (Decimal::ONE - self.config.stop_loss_percentage);
-            let take_profit = position.get_cost() * (Decimal::ONE + self.config.take_profit_percentage);
+            let stop_loss = position.get_notional_value() * (Decimal::ONE - self.config.stop_loss_percentage);
+            let take_profit = position.get_notional_value() * (Decimal::ONE + self.config.take_profit_percentage);
 
             if current_price <= stop_loss {
                 info!("Stop-loss triggered for position: {:?}", position);

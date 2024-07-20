@@ -51,15 +51,15 @@ impl TradeHandlers for Portfolio {
     /// * `trade` - The executed trade to add
     fn add_executed_trade(&mut self, trade: ExecutedTrade) {
         if trade.get_side() == Side::Buy {
-            self.decrease_capital(trade.get_cost(), *trade.get_point());
-            self.increase_assets(trade.get_quantity(), *trade.get_point());
+            self.decrease_capital(trade.get_notional_value(), *trade.get_timestamp());
+            self.increase_assets(trade.get_quantity(), *trade.get_timestamp());
             self.add_open_position(&trade);
         } else {
-            self.increase_capital(trade.get_cost(), *trade.get_point());
-            self.decrease_assets(trade.get_quantity(), *trade.get_point());
+            self.increase_capital(trade.get_notional_value(), *trade.get_timestamp());
+            self.decrease_assets(trade.get_quantity(), *trade.get_timestamp());
             self.clear_open_positions(&trade);
         }
-        self.executed_trades.insert(*trade.get_point(), trade);
+        self.executed_trades.insert(*trade.get_timestamp(), trade);
     }
 
     fn generate_sell_opt(&self, candle: &Candle) -> Option<FutureTrade> {
@@ -71,7 +71,7 @@ impl TradeHandlers for Portfolio {
             let quantity = positions.iter().map(|x| x.get_quantity()).sum();
 
             // the total cost at which the assets were purchased
-            let cost: Decimal = positions.iter().map(|x| x.get_cost()).sum();
+            let cost: Decimal = positions.iter().map(|x| x.get_notional_value()).sum();
 
             // calculate the value of the assets at the proposed rate
             let sell_value = match self.fee_calculator {
@@ -144,7 +144,7 @@ impl TradeHandlers for Portfolio {
                 if trade.get_side() == Side::Buy {
                     // check timeout
                     let now = Utc::now().naive_utc();
-                    let diff = now - *trade.get_point();
+                    let diff = now - *trade.get_timestamp();
                     return if diff >= self.timeout { true } else { false };
                 }
             }
@@ -207,7 +207,7 @@ mod tests {
         let mut portfolio = Portfolio::new(dec!(200.0), dec!(200.0), None);
 
         // handle a buy
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(100.0),
@@ -227,7 +227,7 @@ mod tests {
         assert_eq!(portfolio.get_assets(), dec!(201.0));
 
         // handle a sell
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Sell,
             dec!(100.0),
@@ -248,7 +248,7 @@ mod tests {
         let mut portfolio = Portfolio::new(dec!(200.0), dec!(200.0), None);
         assert!(portfolio.get_last_trade().is_none());
 
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(100.0),
@@ -267,16 +267,16 @@ mod tests {
         let quantity = dec!(1.0);
         let time = Utc::now().naive_utc();
 
-        let trade = ExecutedTrade::new_without_cost("id".to_string(), side, price, quantity, time);
+        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), side, price, quantity, time);
         portfolio.add_executed_trade(trade);
 
         let last_trade = portfolio.get_last_trade().unwrap();
-        assert_eq!(last_trade.get_id(), &id);
+        assert_eq!(last_trade.get_order_id(), &id);
         assert_eq!(last_trade.get_side(), side);
         assert_eq!(last_trade.get_price(), price);
         assert_eq!(last_trade.get_quantity(), quantity);
         assert_eq!(
-            last_trade.get_point().timestamp_millis(),
+            last_trade.get_timestamp().timestamp_millis(),
             time.timestamp_millis()
         );
     }
@@ -289,7 +289,7 @@ mod tests {
 
         // test that we are able to buy if the last trade is a sell
         let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Sell,
             dec!(100.0),
@@ -302,7 +302,7 @@ mod tests {
 
         // test that we are not able to buy if the last trade is a buy and the timeout has not expired
         let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(100.0),
@@ -315,7 +315,7 @@ mod tests {
 
         // test hat we are able to buy if the last trade is a buy and the timeout has expired
         let mut portfolio = Portfolio::new(dec!(100.0), dec!(100.0), None);
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(100.0),

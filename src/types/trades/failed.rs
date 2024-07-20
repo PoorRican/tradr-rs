@@ -1,7 +1,7 @@
 use crate::types::reason_code::ReasonCode;
 use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
-use crate::types::trades::{calc_cost, Trade};
+use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
 use polars::prelude::{NamedFrom, Series};
 use rust_decimal::Decimal;
@@ -25,7 +25,7 @@ impl FailedTrade {
         quantity: Decimal,
         point: NaiveDateTime,
     ) -> FailedTrade {
-        let cost = calc_cost(price, quantity);
+        let cost = calc_notional_value(price, quantity);
         FailedTrade {
             reason,
             side,
@@ -42,8 +42,8 @@ impl FailedTrade {
             side: trade.get_side(),
             price: trade.get_price(),
             quantity: trade.get_quantity(),
-            cost: trade.get_cost(),
-            point: trade.get_point().clone(),
+            cost: trade.get_notional_value(),
+            point: trade.get_timestamp().clone(),
         }
     }
 }
@@ -61,11 +61,11 @@ impl Trade for FailedTrade {
         self.quantity
     }
 
-    fn get_cost(&self) -> Decimal {
+    fn get_notional_value(&self) -> Decimal {
         self.cost
     }
 
-    fn get_point(&self) -> &NaiveDateTime {
+    fn get_timestamp(&self) -> &NaiveDateTime {
         &self.point
     }
 }
@@ -74,7 +74,7 @@ impl Trade for FailedTrade {
 mod test {
     use super::*;
     use crate::types::signals::Side;
-    use crate::types::trades::calc_cost;
+    use crate::types::trades::calc_notional_value;
     use chrono::Utc;
     use rust_decimal_macros::dec;
 
@@ -84,7 +84,7 @@ mod test {
         let side = Side::Buy;
         let price = dec!(1.0);
         let quantity = dec!(2.0);
-        let cost = calc_cost(price, quantity);
+        let cost = calc_notional_value(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let failed_trade = FailedTrade::new(reason, side, price, quantity, point.clone());
@@ -104,7 +104,7 @@ mod test {
         let side = Side::Buy;
         let price = dec!(1.0);
         let quantity = dec!(2.0);
-        let cost = calc_cost(price, quantity);
+        let cost = calc_notional_value(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let future_trade = FutureTrade::new(side, price, quantity, point.clone());

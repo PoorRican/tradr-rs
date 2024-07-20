@@ -214,7 +214,7 @@ mod tests {
 
         let mut portfolio = Portfolio::new(assets, capital, point);
         let trade = FutureTrade::new(Side::Buy, dec!(100.0), dec!(1.0), point + Duration::seconds(1));
-        let executed_trade = ExecutedTrade::with_future_trade("id".to_string(), trade.clone());
+        let executed_trade = ExecutedTrade::from_future_trade("id".to_string(), trade.clone());
         let failed_trade =
             FailedTrade::with_future_trade(ReasonCode::MarketRejection, trade.clone());
 

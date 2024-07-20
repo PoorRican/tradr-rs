@@ -119,7 +119,7 @@ impl BaseMarket for CoinbaseClient {
         product_id: String,
     ) -> Result<ExecutedTrade, reqwest::Error> {
         if !self.enable_trades {
-            let trade = ExecutedTrade::with_future_trade("mock".to_string(), order);
+            let trade = ExecutedTrade::from_future_trade("mock".to_string(), order);
             return Ok(trade);
         }
         let request = CoinbaseOrderRequest::with_future_trade(order, product_id);

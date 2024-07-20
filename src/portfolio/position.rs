@@ -28,7 +28,7 @@ impl PositionHandlers for Portfolio {
     /// * `trade` - The executed trade to add. Only buy trades are added. Sell trades are ignored.
     fn add_open_position(&mut self, trade: &ExecutedTrade) {
         if trade.get_side() == Side::Buy {
-            self.open_positions.push(*trade.get_point());
+            self.open_positions.push(*trade.get_timestamp());
         }
     }
 
@@ -99,7 +99,7 @@ impl PositionHandlers for Portfolio {
             // get the timestamps of the open positions
             let open_positions_points = open_positions
                 .iter()
-                .map(|x| x.get_point())
+                .map(|x| x.get_timestamp())
                 .collect::<Vec<_>>();
 
             // remove the timestamps of the open positions that were closed by the executed trade
@@ -133,12 +133,12 @@ mod tests {
         assert!(portfolio.open_positions.is_empty());
 
         // add a buy and assert it is added to `open_positions`
-        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
+        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
         portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 1);
 
         // add a sell and assert it is *not* added to `open_positions`
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Sell,
             dec!(1.0),
@@ -150,7 +150,7 @@ mod tests {
 
         // add another buy and assert it is added to `open_positions`
         let time2 = time + Duration::minutes(2);
-        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time2);
+        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time2);
         portfolio.add_open_position(&trade);
         assert_eq!(portfolio.open_positions.len(), 2);
 
@@ -167,15 +167,15 @@ mod tests {
         // create some executed trades
         // only `trade` and `trade3` should be returned by `get_open_positions`
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::new_without_cost("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
-        let trade2 = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), Side::Buy, dec!(1.0), dec!(1.0), time);
+        let trade2 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.5),
             dec!(0.9),
             time + Duration::seconds(1),
         );
-        let trade3 = ExecutedTrade::new_without_cost(
+        let trade3 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.7),
@@ -211,35 +211,35 @@ mod tests {
     #[test]
     fn test_select_open_positions() {
         let time = Utc::now().naive_utc();
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(2.0),
             dec!(1.0),
             time + Duration::seconds(1),
         );
-        let trade2 = ExecutedTrade::new_without_cost(
+        let trade2 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.9),
             dec!(1.0),
             time + Duration::seconds(2),
         );
-        let trade3 = ExecutedTrade::new_without_cost(
+        let trade3 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.8),
             dec!(1.0),
             time + Duration::seconds(3),
         );
-        let trade4 = ExecutedTrade::new_without_cost(
+        let trade4 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.0),
             dec!(1.0),
             time + Duration::seconds(4),
         );
-        let trade5 = ExecutedTrade::new_without_cost(
+        let trade5 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(0.1),
@@ -316,28 +316,28 @@ mod tests {
 
         // create some open positions with varying prices
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let trade = ExecutedTrade::new_without_cost(
+        let trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(2.0),
             dec!(1.0),
             time + Duration::seconds(1),
         );
-        let trade2 = ExecutedTrade::new_without_cost(
+        let trade2 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.9),
             dec!(1.0),
             time + Duration::seconds(2),
         );
-        let trade3 = ExecutedTrade::new_without_cost(
+        let trade3 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.8),
             dec!(1.0),
             time + Duration::seconds(3),
         );
-        let trade4 = ExecutedTrade::new_without_cost(
+        let trade4 = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Buy,
             dec!(1.0),
@@ -354,7 +354,7 @@ mod tests {
         assert_eq!(portfolio.open_positions.len(), 4);
 
         // remove the lowest buy
-        let executed_trade = ExecutedTrade::new_without_cost(
+        let executed_trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Sell,
             dec!(1.1),
@@ -365,7 +365,7 @@ mod tests {
         assert_eq!(portfolio.open_positions.len(), 3);
 
         // assert that 2/3 of the remaining positions are cleared when price is 1.9
-        let executed_trade = ExecutedTrade::new_without_cost(
+        let executed_trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Sell,
             dec!(1.9),
@@ -377,7 +377,7 @@ mod tests {
         assert_eq!(portfolio.open_positions[0], time + Duration::seconds(1));
 
         // assert that all positions are cleared when price is 2.0
-        let executed_trade = ExecutedTrade::new_without_cost(
+        let executed_trade = ExecutedTrade::with_calculated_notional(
             "id".to_string(),
             Side::Sell,
             dec!(2.0),

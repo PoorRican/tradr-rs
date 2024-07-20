@@ -60,7 +60,7 @@ fn calculate_position_metrics(portfolio: &Portfolio, current_price: Decimal) -> 
 
     for trade in portfolio.get_open_positions().unwrap().iter() {
         let quantity = trade.get_quantity();
-        let cost = trade.get_cost();
+        let cost = trade.get_notional_value();
 
         total_position_value += quantity * current_price;
         total_cost += cost;

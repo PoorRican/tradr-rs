@@ -63,7 +63,7 @@ impl BacktestingRunner {
                     // attempt trades
                     // TODO: simulate market conditions by adding randomness
                     if let Some(trade) = trade {
-                        let executed = ExecutedTrade::with_future_trade("".to_string(), trade);
+                        let executed = ExecutedTrade::from_future_trade("".to_string(), trade);
                         portfolio.add_executed_trade(executed);
                     }
                 }

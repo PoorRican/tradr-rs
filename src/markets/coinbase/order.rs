@@ -379,12 +379,12 @@ mod order_response_tests {
             secondary_order_id: None,
         };
         let trade: ExecutedTrade = order.clone().into();
-        assert_eq!(trade.get_id(), &order.id.to_string());
+        assert_eq!(trade.get_order_id(), &order.id.to_string());
         assert_eq!(trade.get_side(), order.side);
         assert_eq!(trade.get_price().to_f64().unwrap(), order.price);
         assert_eq!(trade.get_quantity().to_f64().unwrap(), order.size);
         assert_eq!(
-            *trade.get_point(),
+            *trade.get_timestamp(),
             NaiveDateTime::parse_from_str(&order.created_at, "%Y-%m-%dT%H:%M:%S%.fZ").unwrap()
         );
     }

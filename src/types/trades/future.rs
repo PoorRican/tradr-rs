@@ -1,6 +1,6 @@
 use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
-use crate::types::trades::{calc_cost, Trade};
+use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
 use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
@@ -21,7 +21,7 @@ pub struct FutureTrade {
 impl FutureTrade {
     /// Create a new potential trade
     pub fn new(side: Side, price: Decimal, quantity: Decimal, point: NaiveDateTime) -> FutureTrade {
-        let cost = calc_cost(price, quantity);
+        let cost = calc_notional_value(price, quantity);
         FutureTrade {
             side,
             price,
@@ -56,11 +56,11 @@ impl Trade for FutureTrade {
         self.quantity
     }
 
-    fn get_cost(&self) -> Decimal {
+    fn get_notional_value(&self) -> Decimal {
         self.cost
     }
 
-    fn get_point(&self) -> &NaiveDateTime {
+    fn get_timestamp(&self) -> &NaiveDateTime {
         &self.point
     }
 }
@@ -85,7 +85,7 @@ mod tests {
         assert_eq!(trade.get_side(), side);
         assert_eq!(trade.get_price(), price);
         assert_eq!(trade.get_quantity(), quantity);
-        assert_eq!(trade.get_cost(), price * quantity);
-        assert_eq!(trade.get_point(), &point);
+        assert_eq!(trade.get_notional_value(), price * quantity);
+        assert_eq!(trade.get_timestamp(), &point);
     }
 }

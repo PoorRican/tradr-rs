@@ -11,6 +11,7 @@
   Added documentation to the `PortfolioRisk` struct to explain the complex metrics.
 - Created a `PositionManager` for handling trade decisions. It has not been implemented yet.
 - Added `thiserror` and `log` crates
+- Updated `Trade` and `ExecutedTrade` to use better nomenclature for trade types.
 
 ### Portfolio Improvements
 
