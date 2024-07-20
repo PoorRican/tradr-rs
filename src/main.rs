@@ -15,6 +15,7 @@ mod traits;
 mod types;
 mod utils;
 mod risk;
+mod manager;
 
 fn main() {
     let db_path = "data/candle_data.sqlite3";

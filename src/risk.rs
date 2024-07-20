@@ -194,10 +194,10 @@ fn calculate_returns(candles: &[Candle]) -> Vec<Decimal> {
 /// - **Robustness Check:** A consistently high Sharpe ratio across different market conditions can indicate
 /// a robust trading strategy.
 pub struct PortfolioRisk {
-    total_position_value: Decimal,
-    average_entry_price: Decimal,
-    unrealized_pnl: Decimal,
-    value_at_risk: Decimal,
-    beta: Decimal,
-    sharpe_ratio: Decimal,
+    pub total_position_value: Decimal,
+    pub average_entry_price: Decimal,
+    pub unrealized_pnl: Decimal,
+    pub value_at_risk: Decimal,
+    pub beta: Decimal,
+    pub sharpe_ratio: Decimal,
 }

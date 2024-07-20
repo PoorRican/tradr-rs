@@ -2458,6 +2458,7 @@ dependencies = [
  "base64 0.13.1",
  "chrono",
  "csv",
+ "log",
  "polars",
  "polars-io",
  "rand",
@@ -2468,6 +2469,7 @@ dependencies = [
  "serde_json",
  "sqlite",
  "ta",
+ "thiserror",
  "tokio",
 ]
 
