@@ -3,7 +3,6 @@ mod capital;
 mod position;
 mod tracked;
 mod trade;
-mod risk;
 
 use std::collections::HashMap;
 pub use assets::AssetHandlers;
@@ -203,9 +202,7 @@ impl Portfolio {
 mod tests {
     use super::*;
     use crate::portfolio::{assets::AssetHandlers, capital::CapitalHandlers};
-    use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode, Side, Trade};
-    use std::collections::VecDeque;
-
+    use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode, Side};
     #[test]
     fn test_with_data() {
         use crate::types::Side;
