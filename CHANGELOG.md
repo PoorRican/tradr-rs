@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## v0.3.0
+
+### Code Changes
+
+- Remove `Engine`. This will be replaced with an updated implementation in the future.
+- Remove `AsDataFrame` trait-bound from `Trade`. Removed implementations from `ExecutedTrade`, `FutureTrade`, and `Trade`.
+- Implement `Decimal` as the floating-point type for `Trade`, `Candle`, and `Portfolio`.
+- Move risk assessment functionality from `Portfolio` to a dedicated module. It is now a standalone function.
+  Added documentation to the `PortfolioRisk` struct to explain the complex metrics.
+- Created a `PositionManager` for handling trade decisions.
+- Added `thiserror` and `log` crates
+- Updated `Trade` and `ExecutedTrade` to use better nomenclature for trade types.
+- Change default threshold for `BBands`
+- Add logging for when outside of risk tolerance
+- Change `PositionManager` defaults in main
+
+### Portfolio Improvements
+
+- Remove all internal of `DataFrame`. Instead, `Vec` and `HashMap` are used to store data.
+- Add risk functions to `Portfolio`
+- Improve open position tracking. Create an `OpenPosition` struct to track open positions,
+  and add attributes to `Portfolio` to track open position metrics.
+
+---
+
 ## v0.2.1
 
 ### New Features

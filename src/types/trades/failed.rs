@@ -1,19 +1,19 @@
-use crate::traits::AsDataFrame;
 use crate::types::reason_code::ReasonCode;
 use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
-use crate::types::trades::{calc_cost, Trade};
+use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
 /// Represents a trade that has been rejected by the market or otherwise failed
 pub struct FailedTrade {
     reason: ReasonCode,
     side: Side,
-    price: f64,
-    quantity: f64,
-    cost: f64,
+    price: Decimal,
+    quantity: Decimal,
+    cost: Decimal,
     point: NaiveDateTime,
 }
 
@@ -21,11 +21,11 @@ impl FailedTrade {
     pub fn new(
         reason: ReasonCode,
         side: Side,
-        price: f64,
-        quantity: f64,
+        price: Decimal,
+        quantity: Decimal,
         point: NaiveDateTime,
     ) -> FailedTrade {
-        let cost = calc_cost(price, quantity);
+        let cost = calc_notional_value(price, quantity);
         FailedTrade {
             reason,
             side,
@@ -42,23 +42,9 @@ impl FailedTrade {
             side: trade.get_side(),
             price: trade.get_price(),
             quantity: trade.get_quantity(),
-            cost: trade.get_cost(),
-            point: trade.get_point().clone(),
+            cost: trade.get_notional_value(),
+            point: trade.get_timestamp().clone(),
         }
-    }
-}
-
-impl AsDataFrame for FailedTrade {
-    fn as_dataframe(&self) -> DataFrame {
-        DataFrame::new(vec![
-            Series::new("side", vec![self.side as i32]),
-            Series::new("price", vec![self.price]),
-            Series::new("quantity", vec![self.quantity]),
-            Series::new("cost", vec![self.cost]),
-            Series::new("reason", vec![self.reason as i32]),
-            Series::new("point", vec![self.point]),
-        ])
-        .unwrap()
     }
 }
 
@@ -67,19 +53,19 @@ impl Trade for FailedTrade {
         self.side
     }
 
-    fn get_price(&self) -> f64 {
+    fn get_price(&self) -> Decimal {
         self.price
     }
 
-    fn get_quantity(&self) -> f64 {
+    fn get_quantity(&self) -> Decimal {
         self.quantity
     }
 
-    fn get_cost(&self) -> f64 {
+    fn get_notional_value(&self) -> Decimal {
         self.cost
     }
 
-    fn get_point(&self) -> &NaiveDateTime {
+    fn get_timestamp(&self) -> &NaiveDateTime {
         &self.point
     }
 }
@@ -87,18 +73,18 @@ impl Trade for FailedTrade {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::traits::AsDataFrame;
     use crate::types::signals::Side;
-    use crate::types::trades::calc_cost;
+    use crate::types::trades::calc_notional_value;
     use chrono::Utc;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new() {
         let reason = ReasonCode::Unknown;
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = calc_cost(price, quantity);
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
+        let cost = calc_notional_value(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let failed_trade = FailedTrade::new(reason, side, price, quantity, point.clone());
@@ -116,9 +102,9 @@ mod test {
     fn test_with_future_trade() {
         let reason = ReasonCode::Unknown;
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = calc_cost(price, quantity);
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
+        let cost = calc_notional_value(price, quantity);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let future_trade = FutureTrade::new(side, price, quantity, point.clone());
@@ -131,66 +117,5 @@ mod test {
         assert_eq!(failed_trade.quantity, quantity);
         assert_eq!(failed_trade.cost, cost);
         assert_eq!(failed_trade.point, point);
-    }
-
-    /// Test the `as_dataframe` method for `FailedTrade`
-    #[test]
-    fn test_as_dataframe() {
-        let reason = ReasonCode::Unknown;
-        let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = 3.0;
-        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-
-        let trade = FailedTrade {
-            reason,
-            side,
-            price,
-            quantity,
-            cost,
-            point,
-        };
-
-        let df = trade.as_dataframe();
-        assert_eq!(df.shape(), (1, 6));
-        assert_eq!(
-            df.get_column_names(),
-            &["side", "price", "quantity", "cost", "reason", "point"]
-        );
-        assert_eq!(
-            df.column("side").unwrap().i32().unwrap().get(0).unwrap(),
-            side as i32
-        );
-        assert_eq!(
-            df.column("price").unwrap().f64().unwrap().get(0).unwrap(),
-            price
-        );
-        assert_eq!(
-            df.column("quantity")
-                .unwrap()
-                .f64()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-            quantity
-        );
-        assert_eq!(
-            df.column("cost").unwrap().f64().unwrap().get(0).unwrap(),
-            cost
-        );
-        assert_eq!(
-            df.column("reason").unwrap().i32().unwrap().get(0).unwrap(),
-            reason as i32
-        );
-        assert_eq!(
-            df.column("point")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .last()
-                .unwrap(),
-            point.timestamp_millis()
-        );
     }
 }

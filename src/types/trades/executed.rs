@@ -1,117 +1,76 @@
-use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
-use crate::types::trades::{calc_cost, Trade};
+use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
 use polars::prelude::{NamedFrom, Series};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 
 /// Represents a trade that has been executed on the market
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExecutedTrade {
-    id: String,
+    order_id: String,
     side: Side,
-    price: f64,
-    quantity: f64,
-    cost: f64,
-    point: NaiveDateTime,
+    price: Decimal,
+    quantity: Decimal,
+    notional_value: Decimal,
+    timestamp: NaiveDateTime,
 }
 
 impl ExecutedTrade {
     pub fn new(
-        id: String,
+        order_id: String,
         side: Side,
-        price: f64,
-        quantity: f64,
-        cost: f64,
-        point: NaiveDateTime,
+        price: Decimal,
+        quantity: Decimal,
+        notional_value: Decimal,
+        timestamp: NaiveDateTime,
     ) -> Self {
         ExecutedTrade {
-            id,
+            order_id,
             side,
             price,
             quantity,
-            cost,
-            point,
+            notional_value,
+            timestamp,
         }
     }
 
-    /// This is a constructor that internally calculates the cost of the trade
+    /// This is a constructor that internally calculates the notional value of the trade
     ///
     /// This is meant primarily for testing purposes and would not be used for parsing
     /// actual executed trades.
-    pub fn new_without_cost(
-        id: String,
+    pub fn with_calculated_notional(
+        order_id: String,
         side: Side,
-        price: f64,
-        quantity: f64,
-        point: NaiveDateTime,
+        price: Decimal,
+        quantity: Decimal,
+        timestamp: NaiveDateTime,
     ) -> ExecutedTrade {
-        let cost = calc_cost(price, quantity);
+        let notional_value = calc_notional_value(price, quantity);
         ExecutedTrade {
-            id,
+            order_id,
             side,
             price,
             quantity,
-            cost,
-            point,
+            notional_value,
+            timestamp,
         }
     }
-    pub fn with_future_trade(id: String, trade: FutureTrade) -> ExecutedTrade {
+
+    pub fn from_future_trade(order_id: String, trade: FutureTrade) -> ExecutedTrade {
         ExecutedTrade {
-            id,
+            order_id,
             side: trade.get_side(),
             price: trade.get_price(),
             quantity: trade.get_quantity(),
-            cost: trade.get_cost(),
-            point: trade.get_point().clone(),
+            notional_value: trade.get_notional_value(),
+            timestamp: trade.get_timestamp().clone(),
         }
     }
 
-    pub fn get_id(&self) -> &String {
-        &self.id
-    }
-
-    pub fn from_row(row: &DataFrame) -> Self {
-        assert_eq!(row.height(), 1);
-        assert_eq!(
-            row.get_column_names(),
-            &["id", "side", "price", "quantity", "cost", "point"]
-        );
-        let id = row.column("id").unwrap().str().unwrap().get(0).unwrap();
-        let side = Side::from(row.column("side").unwrap().i8().unwrap().get(0).unwrap());
-        let price = row.column("price").unwrap().f64().unwrap().get(0).unwrap();
-        let quantity = row
-            .column("quantity")
-            .unwrap()
-            .f64()
-            .unwrap()
-            .get(0)
-            .unwrap();
-        let cost = row.column("cost").unwrap().f64().unwrap().get(0).unwrap();
-        let point = NaiveDateTime::from_timestamp_millis(
-            row.column("point")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-        )
-        .unwrap();
-        ExecutedTrade::new(id.to_string(), side, price, quantity, cost, point)
-    }
-}
-
-impl AsDataFrame for ExecutedTrade {
-    fn as_dataframe(&self) -> DataFrame {
-        DataFrame::new(vec![
-            Series::new("id", vec![self.id.clone()]),
-            Series::new("side", vec![self.side as i8]),
-            Series::new("price", vec![self.price]),
-            Series::new("quantity", vec![self.quantity]),
-            Series::new("cost", vec![self.cost]),
-            Series::new("point", vec![self.point]),
-        ])
-        .unwrap()
+    pub fn get_order_id(&self) -> &String {
+        &self.order_id
     }
 }
 
@@ -120,170 +79,100 @@ impl Trade for ExecutedTrade {
         self.side
     }
 
-    fn get_price(&self) -> f64 {
+    fn get_price(&self) -> Decimal {
         self.price
     }
 
-    fn get_quantity(&self) -> f64 {
+    fn get_quantity(&self) -> Decimal {
         self.quantity
     }
 
-    fn get_cost(&self) -> f64 {
-        self.cost
+    fn get_notional_value(&self) -> Decimal {
+        self.notional_value
     }
 
-    fn get_point(&self) -> &NaiveDateTime {
-        &self.point
+    fn get_timestamp(&self) -> &NaiveDateTime {
+        &self.timestamp
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::traits::AsDataFrame;
     use crate::types::signals::Side;
-    use crate::types::trades::calc_cost;
+    use crate::types::trades::calc_notional_value;
     use chrono::Utc;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new() {
-        let id = "id".to_string();
-        let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = 3.0;
-        let point = Utc::now().naive_utc();
+        let order_id = "order123".to_string();
+        let execution_side = Side::Buy;
+        let execution_price = dec!(100.50);
+        let execution_quantity = dec!(10.0);
+        let notional_value = dec!(1005.00);
+        let execution_timestamp = Utc::now().naive_utc();
 
-        let trade = ExecutedTrade::new(id.clone(), side, price, quantity, cost, point.clone());
+        let trade = ExecutedTrade::new(
+            order_id.clone(),
+            execution_side,
+            execution_price,
+            execution_quantity,
+            notional_value,
+            execution_timestamp.clone(),
+        );
 
-        assert_eq!(trade.id, id);
-        assert_eq!(trade.side, side);
-        assert_eq!(trade.price, price);
-        assert_eq!(trade.quantity, quantity);
-        assert_eq!(trade.cost, cost);
-        assert_eq!(trade.point, point);
+        assert_eq!(trade.order_id, order_id);
+        assert_eq!(trade.side, execution_side);
+        assert_eq!(trade.price, execution_price);
+        assert_eq!(trade.quantity, execution_quantity);
+        assert_eq!(trade.notional_value, notional_value);
+        assert_eq!(trade.timestamp, execution_timestamp);
     }
 
     #[test]
-    fn test_new_without_cost() {
-        let id = "id".to_string();
-        let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = calc_cost(price, quantity);
-        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+    fn test_new_with_calculated_notional() {
+        let order_id = "order456".to_string();
+        let execution_side = Side::Sell;
+        let execution_price = dec!(50.25);
+        let execution_quantity = dec!(5.0);
+        let notional_value = calc_notional_value(execution_price, execution_quantity);
+        let execution_timestamp = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let trade =
-            ExecutedTrade::new_without_cost(id.clone(), side, price, quantity, point.clone());
+        let trade = ExecutedTrade::with_calculated_notional(
+            order_id.clone(),
+            execution_side,
+            execution_price,
+            execution_quantity,
+            execution_timestamp.clone(),
+        );
 
-        assert_eq!(trade.id, id);
-        assert_eq!(trade.side, side);
-        assert_eq!(trade.price, price);
-        assert_eq!(trade.quantity, quantity);
-        assert_eq!(trade.cost, cost);
-        assert_eq!(trade.point, point);
+        assert_eq!(trade.order_id, order_id);
+        assert_eq!(trade.side, execution_side);
+        assert_eq!(trade.price, execution_price);
+        assert_eq!(trade.quantity, execution_quantity);
+        assert_eq!(trade.notional_value, notional_value);
+        assert_eq!(trade.timestamp, execution_timestamp);
     }
 
     #[test]
-    fn test_with_future_trade() {
-        let id = "id".to_string();
-        let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = calc_cost(price, quantity);
-        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+    fn test_from_future_trade() {
+        let order_id = "order789".to_string();
+        let execution_side = Side::Buy;
+        let execution_price = dec!(75.00);
+        let execution_quantity = dec!(8.0);
+        let notional_value = calc_notional_value(execution_price, execution_quantity);
+        let execution_timestamp = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let future_trade = FutureTrade::new(side, price, quantity, point.clone());
+        let future_trade = FutureTrade::new(execution_side, execution_price, execution_quantity, execution_timestamp.clone());
 
-        let failed_trade = ExecutedTrade::with_future_trade(id.clone(), future_trade);
+        let executed_trade = ExecutedTrade::from_future_trade(order_id.clone(), future_trade);
 
-        assert_eq!(failed_trade.id, id);
-        assert_eq!(failed_trade.side, side);
-        assert_eq!(failed_trade.price, price);
-        assert_eq!(failed_trade.quantity, quantity);
-        assert_eq!(failed_trade.cost, cost);
-        assert_eq!(failed_trade.point, point);
-    }
-
-    #[test]
-    fn test_as_dataframe() {
-        let id = "id".to_string();
-        let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let cost = 3.0;
-        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-
-        let trade = ExecutedTrade {
-            id: id.clone(),
-            side,
-            price,
-            quantity,
-            cost,
-            point,
-        };
-
-        let df = trade.as_dataframe();
-        assert_eq!(df.shape(), (1, 6));
-        assert_eq!(
-            df.get_column_names(),
-            &["id", "side", "price", "quantity", "cost", "point"]
-        );
-        assert_eq!(
-            df.column("side").unwrap().i8().unwrap().get(0).unwrap(),
-            side as i8
-        );
-        assert_eq!(
-            df.column("price").unwrap().f64().unwrap().get(0).unwrap(),
-            price
-        );
-        assert_eq!(
-            df.column("quantity")
-                .unwrap()
-                .f64()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-            quantity
-        );
-        assert_eq!(
-            df.column("cost").unwrap().f64().unwrap().get(0).unwrap(),
-            cost
-        );
-        assert_eq!(df.column("id").unwrap().str().unwrap().get(0).unwrap(), id);
-        assert_eq!(
-            df.column("point")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-            point.timestamp_millis()
-        );
-    }
-
-    #[test]
-    fn test_from_row() {
-        use polars::prelude::*;
-
-        let time = Utc::now().naive_utc();
-
-        let row = df![
-            "id" => ["id"],
-            "side" => [Side::Buy as i8],
-            "price" => [1.0],
-            "quantity" => [2.0],
-            "cost" => [3.0],
-            "point" => [time]
-        ]
-        .unwrap();
-        let trade = ExecutedTrade::from_row(&row);
-
-        assert_eq!(trade.id, "id");
-        assert_eq!(trade.side, Side::Buy);
-        assert_eq!(trade.price, 1.0);
-        assert_eq!(trade.quantity, 2.0);
-        assert_eq!(trade.cost, 3.0);
-        assert_eq!(trade.point.timestamp_millis(), time.timestamp_millis());
+        assert_eq!(executed_trade.order_id, order_id);
+        assert_eq!(executed_trade.side, execution_side);
+        assert_eq!(executed_trade.price, execution_price);
+        assert_eq!(executed_trade.quantity, execution_quantity);
+        assert_eq!(executed_trade.notional_value, notional_value);
+        assert_eq!(executed_trade.timestamp, execution_timestamp);
     }
 }

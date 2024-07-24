@@ -7,6 +7,8 @@ use std::env::temp_dir;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
 use polars::error::PolarsResult;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 
 /// create temp dir for testing
 pub fn create_temp_dir(dir: &Path) -> PathBuf {
@@ -59,11 +61,11 @@ pub fn extract_candles_from_db(db_path: &str, table_name: &str) -> Result<Vec<Ca
                 time: DateTime::from_timestamp_millis(data.read::<i64, _>(0))
                     .unwrap()
                     .naive_utc(),
-                high: data.read::<f64, _>(1),
-                low: data.read::<f64, _>(2),
-                open: data.read::<f64, _>(3),
-                close: data.read::<f64, _>(4),
-                volume: data.read::<f64, _>(5),
+                high: Decimal::from_f64(data.read::<f64, _>(1)).unwrap(),
+                low: Decimal::from_f64(data.read::<f64, _>(2)).unwrap(),
+                open: Decimal::from_f64(data.read::<f64, _>(3)).unwrap(),
+                close: Decimal::from_f64(data.read::<f64, _>(4)).unwrap(),
+                volume: Decimal::from_f64(data.read::<f64, _>(5)).unwrap(),
             }
         })
         .collect::<Vec<_>>();
@@ -85,14 +87,26 @@ pub fn extract_candles_from_df(df: &DataFrame) -> PolarsResult<Vec<Candle>> {
         |i| {
             Candle {
                 time: DateTime::from_timestamp_millis(time.get(i).unwrap()).unwrap().naive_utc(),
-                high: high.get(i).unwrap(),
-                low: low.get(i).unwrap(),
-                open: open.get(i).unwrap(),
-                close: close.get(i).unwrap(),
-                volume: volume.get(i).unwrap(),
+                high: Decimal::from_f64(high.get(i).unwrap()).unwrap(),
+                low: Decimal::from_f64(low.get(i).unwrap()).unwrap(),
+                open: Decimal::from_f64(open.get(i).unwrap()).unwrap(),
+                close: Decimal::from_f64(close.get(i).unwrap()).unwrap(),
+                volume: Decimal::from_f64(volume.get(i).unwrap()).unwrap(),
             }
         },
     ).collect())
+}
+
+pub fn extract_signals_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<Vec<Signal>> {
+    Ok(df.column(column_name)?.i8()?
+        .into_iter()
+        .map(|value| {
+            if let Some(value) = value {
+                return Signal::from(value);
+            } else {
+                return Signal::Hold;
+            }
+        }).collect())
 }
 
 pub fn extract_side_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<Vec<Side>> {

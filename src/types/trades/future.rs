@@ -1,25 +1,25 @@
 use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
-use crate::types::trades::{calc_cost, Trade};
+use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
-use polars::frame::DataFrame;
-use polars::prelude::{NamedFrom, Series};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
 /// Represents a potential trade to be executed
 #[derive(Clone, Debug, PartialEq)]
 pub struct FutureTrade {
     side: Side,
-    price: f64,
-    quantity: f64,
-    cost: f64,
+    price: Decimal,
+    quantity: Decimal,
+    cost: Decimal,
     /// The time at which the trade was identified
     point: NaiveDateTime,
 }
 
 impl FutureTrade {
     /// Create a new potential trade
-    pub fn new(side: Side, price: f64, quantity: f64, point: NaiveDateTime) -> FutureTrade {
-        let cost = calc_cost(price, quantity);
+    pub fn new(side: Side, price: Decimal, quantity: Decimal, point: NaiveDateTime) -> FutureTrade {
+        let cost = calc_notional_value(price, quantity);
         FutureTrade {
             side,
             price,
@@ -29,8 +29,7 @@ impl FutureTrade {
         }
     }
 
-    pub fn new_from_cost(side: Side, price: f64, cost: f64, point: NaiveDateTime) -> FutureTrade {
-        let quantity = cost / price;
+    pub fn new_with_nominal(side: Side, price: Decimal, quantity: Decimal, cost: Decimal, point: NaiveDateTime) -> FutureTrade {
         FutureTrade {
             side,
             price,
@@ -38,19 +37,6 @@ impl FutureTrade {
             cost,
             point,
         }
-    }
-}
-
-impl AsDataFrame for FutureTrade {
-    fn as_dataframe(&self) -> DataFrame {
-        DataFrame::new(vec![
-            Series::new("side", vec![self.side as i32]),
-            Series::new("price", vec![self.price]),
-            Series::new("quantity", vec![self.quantity]),
-            Series::new("cost", vec![self.cost]),
-            Series::new("point", vec![self.point]),
-        ])
-        .unwrap()
     }
 }
 
@@ -59,36 +45,36 @@ impl Trade for FutureTrade {
         self.side
     }
 
-    fn get_price(&self) -> f64 {
+    fn get_price(&self) -> Decimal {
         self.price
     }
 
-    fn get_quantity(&self) -> f64 {
+    fn get_quantity(&self) -> Decimal {
         self.quantity
     }
 
-    fn get_cost(&self) -> f64 {
+    fn get_notional_value(&self) -> Decimal {
         self.cost
     }
 
-    fn get_point(&self) -> &NaiveDateTime {
+    fn get_timestamp(&self) -> &NaiveDateTime {
         &self.point
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::traits::AsDataFrame;
     use crate::types::signals::Side;
     use crate::types::trades::future::FutureTrade;
     use crate::types::trades::Trade;
     use chrono::{NaiveDateTime, Utc};
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new() {
         let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
+        let price = dec!(1.0);
+        let quantity = dec!(2.0);
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let trade = FutureTrade::new(side, price, quantity, point);
@@ -96,54 +82,7 @@ mod tests {
         assert_eq!(trade.get_side(), side);
         assert_eq!(trade.get_price(), price);
         assert_eq!(trade.get_quantity(), quantity);
-        assert_eq!(trade.get_cost(), price * quantity);
-        assert_eq!(trade.get_point(), &point);
-    }
-
-    #[test]
-    fn test_as_dataframe() {
-        let side = Side::Buy;
-        let price = 1.0;
-        let quantity = 2.0;
-        let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-
-        let trade = FutureTrade::new(side, price, quantity, point);
-        let df = trade.as_dataframe();
-
-        assert_eq!(df.shape(), (1, 5));
-        assert_eq!(
-            df.get_column_names(),
-            &["side", "price", "quantity", "cost", "point"]
-        );
-        assert_eq!(
-            df.column("side").unwrap().i32().unwrap().get(0).unwrap(),
-            side as i32
-        );
-        assert_eq!(
-            df.column("price").unwrap().f64().unwrap().get(0).unwrap(),
-            price
-        );
-        assert_eq!(
-            df.column("quantity")
-                .unwrap()
-                .f64()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-            quantity
-        );
-        assert_eq!(
-            df.column("cost").unwrap().f64().unwrap().get(0).unwrap(),
-            trade.cost
-        );
-        assert_eq!(
-            df.column("point")
-                .unwrap()
-                .datetime()
-                .unwrap()
-                .get(0)
-                .unwrap(),
-            point.timestamp_millis()
-        );
+        assert_eq!(trade.get_notional_value(), price * quantity);
+        assert_eq!(trade.get_timestamp(), &point);
     }
 }

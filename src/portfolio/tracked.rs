@@ -1,10 +1,12 @@
 use chrono::{NaiveDateTime, Utc};
 use polars::prelude::*;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
 /// Create a DataFrame with a single row
 ///
 /// This low-level helper function used when appending rows to a TrackedValue.
-fn create_row<T>(value: f64, timestamp: T) -> DataFrame
+fn create_row<T>(value: Decimal, timestamp: T) -> DataFrame
 where
     T: Into<Option<NaiveDateTime>>,
 {
@@ -13,7 +15,7 @@ where
         .unwrap_or_else(|| NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap());
     df!(
         "timestamp" => [_timestamp],
-        "value" => [value]
+        "value" => [value.to_f64().unwrap()]
     )
     .unwrap()
 }
@@ -27,6 +29,14 @@ where
 #[derive(Clone, Debug)]
 pub struct TrackedValue(DataFrame);
 
+impl Default for TrackedValue {
+    fn default() -> Self {
+        let ts_vec: Vec<NaiveDateTime> = vec![];
+        let val_vec: Vec<f64> = vec![];
+        TrackedValue(df!["timestamp" => ts_vec, "value" => val_vec].unwrap())
+    }
+}
+
 impl TrackedValue {
     /// Create a new TrackedValue with an initial value and a starting point in time
     ///
@@ -34,7 +44,7 @@ impl TrackedValue {
     ///
     /// * `amount` - The initial value of the tracked value
     /// * `timestamp` - The starting point in time
-    pub fn with_initial<T>(amount: f64, timestamp: T) -> TrackedValue
+    pub fn with_initial<T>(amount: Decimal, timestamp: T) -> TrackedValue
     where
         T: Into<Option<NaiveDateTime>>,
     {
@@ -49,7 +59,7 @@ impl TrackedValue {
     /// # Arguments
     /// * `amount` - The amount to add to the tracked value
     /// * `timestamp` - The point in time at which the value was added
-    fn add_value<T>(&mut self, amount: f64, timestamp: T)
+    fn add_value<T>(&mut self, amount: Decimal, timestamp: T)
     where
         T: Into<Option<NaiveDateTime>>,
     {
@@ -60,7 +70,7 @@ impl TrackedValue {
     /// Get the most recent value
     ///
     /// This is the main interface for retrieving the "value".
-    pub fn get_last_value(&self) -> f64 {
+    pub fn get_last_value(&self) -> Decimal {
         // find last row
         let last_row = self
             .0
@@ -76,7 +86,7 @@ impl TrackedValue {
 
         // extract value
         if let AnyValue::Float64(inner) = val {
-            inner
+            Decimal::from_f64(inner).unwrap()
         } else {
             panic!("Could not get last value from time-series chart")
         }
@@ -87,7 +97,7 @@ impl TrackedValue {
     /// # Arguments
     /// * `amount` - The amount to decrement the total value by
     /// * `timestamp` - The point in time at which the total value was decremented
-    pub fn decrement<T>(&mut self, amount: f64, timestamp: T)
+    pub fn decrement<T>(&mut self, amount: Decimal, timestamp: T)
     where
         T: Into<Option<NaiveDateTime>>,
     {
@@ -100,7 +110,7 @@ impl TrackedValue {
     /// # Arguments
     /// * `amount` - The amount to increment the total value by
     /// * `timestamp` - The point in time at which the total value was incremented
-    pub fn increment<T>(&mut self, amount: f64, timestamp: T)
+    pub fn increment<T>(&mut self, amount: Decimal, timestamp: T)
     where
         T: Into<Option<NaiveDateTime>>,
     {
@@ -125,50 +135,46 @@ impl Into<DataFrame> for TrackedValue {
 mod tests {
     use super::*;
     use chrono::Duration;
-
-    /// truncate float to 2 decimal places
-    fn trunc_float(f: f64) -> f64 {
-        (f * 100.0).trunc() / 100.0
-    }
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_increment() {
         let start_time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let start_val = 1.0;
-        let expected = 2.0;
+        let start_val = dec!(1.0);
+        let expected = dec!(2.0);
 
         let mut chart = TrackedValue::with_initial(start_val, start_time);
         for i in 0..10 {
-            chart.increment(0.1, start_time + Duration::seconds(i));
+            chart.increment(dec!(0.1), start_time + Duration::seconds(i));
         }
 
         let last_value = chart.get_last_value();
-        assert_eq!(trunc_float(last_value), expected);
+        assert_eq!(last_value, expected);
     }
     #[test]
     fn test_decrement() {
         let start_time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let start_val = 1.0;
-        let expected = 0.1;
+        let start_val = dec!(1.0);
+        let expected = dec!(0.1);
 
         let mut chart = TrackedValue::with_initial(start_val, start_time);
         for i in 0..9 {
-            chart.decrement(0.1, start_time + Duration::seconds(i));
+            chart.decrement(dec!(0.1), start_time + Duration::seconds(i));
         }
 
         let last_value = chart.get_last_value();
-        assert_eq!(trunc_float(last_value), expected);
+        assert_eq!(last_value, expected);
     }
 
     #[test]
     fn test_last_value() {
         let start_time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
-        let start_val = 1.0;
-        let expected = start_val + 9.0;
+        let start_val = dec!(1.0);
+        let expected = start_val + dec!(9.0);
 
         let mut chart = TrackedValue::with_initial(start_val, start_time);
         for i in 0..10 {
-            chart.add_value(start_val + i as f64, start_time + Duration::seconds(i));
+            chart.add_value(start_val + Decimal::from(i), start_time + Duration::seconds(i));
         }
 
         let last_value = chart.get_last_value();
@@ -178,10 +184,10 @@ mod tests {
     #[test]
     fn test_add_row() {
         // starting value and added value
-        let start_val = 1.0;
+        let start_val = dec!(1.0);
         let time = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let added_val = 2.0;
+        let added_val = dec!(2.0);
         let added_time = time + Duration::seconds(1);
 
         // manually construct TimeSeriesChart
@@ -198,7 +204,7 @@ mod tests {
                 .unwrap()
                 .get(0)
                 .unwrap(),
-            start_val
+            start_val.to_f64().unwrap()
         );
         assert_eq!(
             chart
@@ -223,7 +229,7 @@ mod tests {
                 .unwrap()
                 .get(0)
                 .unwrap(),
-            start_val
+            start_val.to_f64().unwrap()
         );
         assert_eq!(
             chart
@@ -247,7 +253,7 @@ mod tests {
                 .unwrap()
                 .get(1)
                 .unwrap(),
-            added_val
+            added_val.to_f64().unwrap()
         );
         assert_eq!(
             chart

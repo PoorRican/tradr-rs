@@ -1,74 +1,68 @@
-use std::path::Path;
-use std::time::Duration;
-use tokio::time::sleep;
-use crate::timing::wait_until;
+use std::time::Instant;
+use log::info;
+use crate::traits::AsDataFrame;
+use rust_decimal_macros::dec;
+use crate::backtesting::BacktestingRunner;
+use crate::portfolio::PortfolioArgs;
 
+mod backtesting;
 mod indicators;
 mod markets;
 mod portfolio;
-mod strategies;
 mod serialization;
+mod strategies;
+mod timing;
 mod traits;
 mod types;
-mod engine;
 mod utils;
-mod timing;
+mod risk;
+mod manager;
 
 
-#[tokio::main]
-async fn main() {
-    println!("Starting...\n");
+fn main() {
+    colog::init();
 
-    const INTERVAL: &str = "5m";
+    let db_path = "data/candle_data.sqlite3";
+    let candle_table = "coinbase_SHIBUSD_5m_candles";
+    let market_data_table = "coinbase_BTCUSD_5m_candles";
 
-    let market = markets::CoinbaseClient::new()
-        .disable_trades();
-    let portfolio = portfolio::Portfolio::new(0.0, 100.0, None);
-    let strategy = strategies::Strategy::new(vec![
-        Box::new(indicators::BBands::new(20, 2.0)),
-    ], strategies::Consensus::Unison);
-    let mut engine = engine::Engine::new(
-        INTERVAL,
-        portfolio,
+    let candles = utils::extract_candles_from_db(db_path, candle_table).unwrap().as_dataframe();
+    let market_data = utils::extract_candles_from_db(db_path, market_data_table).unwrap().as_dataframe();
+
+    let strategy = strategies::Strategy::new(
+        vec![Box::new(indicators::BBands::default())],
+        strategies::Consensus::Unison,
+    );
+
+    let portfolio_args = PortfolioArgs {
+        assets: dec!(0.0),
+        capital: dec!(100.0),
+        threshold: dec!(0.0),
+        ..Default::default()
+    };
+    let manager_config = manager::PositionManagerConfig {
+        max_position_size: dec!(100.0),
+        stop_loss_percentage: dec!(0.05),
+        take_profit_percentage: dec!(0.1),
+        max_beta: dec!(1.4),
+        var_limit: dec!(10.0),
+        min_sharpe_ratio: dec!(0.4),
+        ..Default::default()
+    };
+    let mut runner = BacktestingRunner::new(
         strategy,
-        "MATIC-USD",
-        &market);
+        portfolio_args,
+        manager_config,
+    );
 
+    let start_time = Instant::now();
+    info!("Starting to process");
+    let performance = runner.run(&candles, &market_data).unwrap();
+    let elapsed = start_time.elapsed();
 
-    // setup path
-    let path = Path::new("data");
+    let candle_len = candles.height();
+    println!("Finished processing {:?} rows in {:?}", candle_len, elapsed);
+    println!("Avg. processing time per row: {:?}", elapsed / candle_len as u32);
 
-    // bootstrap
-    engine.initialize().await;
-    engine.save(path)
-        .expect("Failed to save data");
-
-    // wait until the next candle is released
-    println!("Waiting until next interval...");
-    wait_until(INTERVAL).await;
-
-    // run the engine once per interval
-    println!("\nBeginning loop...");
-    print_time();
-
-    loop {
-        print!("\n");
-        // if there is no new data, wait then try again
-        // certain intervals might not have data available and can be significantly delayed.
-        // therefore, in order to catch as much data as possible, a wait time is necessary
-        // in order to prevent the next update from returning more than one row
-        while !engine.run().await {
-            let wait = 20;
-            sleep(Duration::from_secs(wait)).await;
-        }
-        println!("Ran 1 iteration");
-        print_time();
-        engine.save(path).unwrap();
-        wait_until(INTERVAL).await;
-    }
-}
-
-fn print_time() {
-    let time = chrono::Utc::now();
-    println!("The time is now {time}");
+    println!("Performance: {:?}", performance);
 }

@@ -8,7 +8,7 @@ use polars::prelude::*;
 
 const DEFAULT_PERIOD: usize = 20;
 const DEFAULT_MULTIPLIER: f64 = 2.0;
-const DEFAULT_THRESHOLD: f64 = 0.8;
+const DEFAULT_THRESHOLD: f64 = 0.99;
 const DEFAULT_SOURCE_COL_NAME: &str = "close";
 
 #[derive(Debug, Clone)]

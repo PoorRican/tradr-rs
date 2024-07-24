@@ -119,7 +119,7 @@ impl BaseMarket for CoinbaseClient {
         product_id: String,
     ) -> Result<ExecutedTrade, reqwest::Error> {
         if !self.enable_trades {
-            let trade = ExecutedTrade::with_future_trade("mock".to_string(), order);
+            let trade = ExecutedTrade::from_future_trade("mock".to_string(), order);
             return Ok(trade);
         }
         let request = CoinbaseOrderRequest::with_future_trade(order, product_id);
@@ -174,6 +174,7 @@ impl Market for CoinbaseClient {
 
 #[cfg(test)]
 mod tests {
+    use rust_decimal_macros::dec;
     use super::*;
     use crate::types::Side;
 
@@ -202,7 +203,7 @@ mod tests {
     async fn test_submit_order() {
         let product_id = "BTC-USD".to_string();
         let client = CoinbaseClient::new();
-        let order = FutureTrade::new(Side::Buy, 1.0, 1.0, Utc::now().naive_utc());
+        let order = FutureTrade::new(Side::Buy, dec!(1.0), dec!(1.0), Utc::now().naive_utc());
         let response = client.submit_order(order, product_id).await;
 
         // TODO: use a small trade or testnet to make this work

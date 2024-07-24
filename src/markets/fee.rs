@@ -1,3 +1,5 @@
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use crate::types::Side;
 
 /// A trait for calculating the amounts of fees to be deducted from a trade.
@@ -9,7 +11,7 @@ use crate::types::Side;
 /// For buy trades, the fee is added to the cost of the buy order. For sell trades, the fee is
 /// subtracted from the amount of quote currency yielded by the trade.
 pub trait FeeCalculator {
-    fn cost_including_fee(&self, cost: f64, side: Side) -> f64;
+    fn cost_including_fee(&self, cost: Decimal, side: Side) -> Decimal;
 }
 
 /// A simple fee calculator that has a fixed percentage fee.
@@ -23,19 +25,19 @@ pub trait FeeCalculator {
 ///
 /// This fee calculator assumes that the fee is the same for both buy and sell orders.
 pub struct SimplePercentageFee {
-    taker_fee: f64,
+    taker_fee: Decimal,
 }
 
 impl SimplePercentageFee {
-    pub fn new(fee_percentage: f64) -> Self {
+    pub fn new(fee_percentage: Decimal) -> Self {
         Self {
-            taker_fee: fee_percentage / 100.0,
+            taker_fee: fee_percentage / dec!(100.0),
         }
     }
 }
 
 impl FeeCalculator for SimplePercentageFee {
-    fn cost_including_fee(&self, cost: f64, side: Side) -> f64 {
+    fn cost_including_fee(&self, cost: Decimal, side: Side) -> Decimal {
         let fee = cost * self.taker_fee;
         match side {
             Side::Buy => cost + fee,
@@ -50,18 +52,18 @@ mod tests {
 
     #[test]
     fn test_percentage_taker_fee_calculator() {
-        let trade_price = 100.0;
-        let fee_calculator = SimplePercentageFee::new(0.8);
+        let trade_price = dec!(100.0);
+        let fee_calculator = SimplePercentageFee::new(dec!(0.8));
 
         // assert that the fee calculator was initialized correctly
-        assert_eq!(fee_calculator.taker_fee, 0.008);
+        assert_eq!(fee_calculator.taker_fee, dec!(0.008));
 
         // assert that the fee for a buy trade is calculated correctly
         let fee = fee_calculator.cost_including_fee(trade_price, Side::Buy);
-        assert_eq!(fee, 100.8);
+        assert_eq!(fee, dec!(100.8));
 
         // assert that the fee for a sell trade is calculated correctly
         let fee = fee_calculator.cost_including_fee(trade_price, Side::Sell);
-        assert_eq!(fee, 99.2);
+        assert_eq!(fee, dec!(99.2));
     }
 }
