@@ -12,6 +12,7 @@
 - Created a `PositionManager` for handling trade decisions.
 - Added `thiserror` and `log` crates
 - Updated `Trade` and `ExecutedTrade` to use better nomenclature for trade types.
+- Change default threshold for `BBands`
 
 ### Portfolio Improvements
 
