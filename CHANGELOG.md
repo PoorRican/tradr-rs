@@ -14,6 +14,7 @@
 - Updated `Trade` and `ExecutedTrade` to use better nomenclature for trade types.
 - Change default threshold for `BBands`
 - Add logging for when outside of risk tolerance
+- Change `PositionManager` defaults in main
 
 ### Portfolio Improvements
 

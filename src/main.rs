@@ -46,7 +46,7 @@ fn main() {
         take_profit_percentage: dec!(0.1),
         max_beta: dec!(1.4),
         var_limit: dec!(10.0),
-        min_sharpe_ratio: dec!(0.6),
+        min_sharpe_ratio: dec!(0.4),
         ..Default::default()
     };
     let mut runner = BacktestingRunner::new(
