@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.3.1
+
+### Code Changes
+
+- Show date ranges upon backtesting
+
+---
+
 ## v0.3.0
 
 ### Code Changes

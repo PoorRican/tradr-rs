@@ -1,9 +1,12 @@
 use std::time::Instant;
+use chrono::{DateTime, NaiveDateTime};
 use log::info;
 use crate::traits::AsDataFrame;
-use rust_decimal_macros::dec;
 use crate::backtesting::BacktestingRunner;
 use crate::portfolio::PortfolioArgs;
+
+use polars::prelude::*;
+use rust_decimal_macros::dec;
 
 mod backtesting;
 mod indicators;
@@ -59,6 +62,26 @@ fn main() {
     info!("Starting to process");
     let performance = runner.run(&candles, &market_data).unwrap();
     let elapsed = start_time.elapsed();
+
+    // print candle statistics
+    let candle_start = candles.column("time")
+        .unwrap()
+        .datetime()
+        .unwrap()
+        .head(Some(1))
+        .get(0)
+        .unwrap();
+    let candle_start = DateTime::from_timestamp_millis(candle_start).unwrap().naive_utc();
+    let candle_end = candles.column("time")
+        .unwrap()
+        .datetime()
+        .unwrap()
+        .tail(Some(1))
+        .get(0)
+        .unwrap();
+    let candle_end = DateTime::from_timestamp_millis(candle_end).unwrap().naive_utc();
+
+    info!("Candles range: {:?} - {:?}", candle_start, candle_end);
 
     let candle_len = candles.height();
     println!("Finished processing {:?} rows in {:?}", candle_len, elapsed);
