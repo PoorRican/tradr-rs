@@ -111,7 +111,7 @@ impl BacktestingRunner {
                     let trimmed_market = utils::extract_candles_from_df(&trimmed_market).unwrap();
 
                     // calculate current portfolio risk metrics
-                    let risk = calculate_risk(&portfolio, &trimmed_candles, &trimmed_market)
+                    let risk = calculate_risk(&portfolio, &trimmed_market, &trimmed_candles)
                         .map_err(|e| {
                             info!("Error calculating risk: {:?}", e);
                             BacktestingErrors::RiskCalculationError(e)
@@ -126,14 +126,12 @@ impl BacktestingRunner {
                         })?;
 
                     let trade = match decision {
-                        TradeDecision::ExecuteBuy(amount) => {
-                            info!("Portfolio Risk Metrics: {:?}", risk);
-                            FutureTrade::new_with_calculate_nominal(Side::Buy, current_price, amount, candle.time)
+                        TradeDecision::ExecuteBuy(quantity) => {
+                            FutureTrade::new(Side::Buy, current_price, quantity, candle.time)
                         },
-                        TradeDecision::ExecuteSell(amount, trade_ids) => {
-                            info!("Portfolio Risk Metrics: {:?}", risk);
+                        TradeDecision::ExecuteSell(quantity, trade_ids) => {
                             info!("Closing positions: {:?}", trade_ids);
-                            FutureTrade::new_with_calculate_nominal(Side::Sell, current_price, amount, candle.time)
+                            FutureTrade::new(Side::Sell, current_price, quantity, candle.time)
                         },
                         TradeDecision::DoNothing => continue,
                     };

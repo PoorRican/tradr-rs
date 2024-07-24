@@ -42,8 +42,7 @@ pub fn calculate_risk(portfolio: &Portfolio, market_data: &[Candle], historical_
     let returns = calculate_returns(historical_data);
 
     let value_at_risk = if total_position_value == Decimal::ZERO {
-        // Use historical data for initial VaR calculation
-        calculate_value_at_risk(&returns, Decimal::from(1_000)) // Assume a default position value
+        Decimal::ZERO
     } else {
         calculate_value_at_risk(&returns, total_position_value)
     };

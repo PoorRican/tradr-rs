@@ -29,8 +29,7 @@ impl FutureTrade {
         }
     }
 
-    pub fn new_with_calculate_nominal(side: Side, price: Decimal, cost: Decimal, point: NaiveDateTime) -> FutureTrade {
-        let quantity = cost / price;
+    pub fn new_with_nominal(side: Side, price: Decimal, quantity: Decimal, cost: Decimal, point: NaiveDateTime) -> FutureTrade {
         FutureTrade {
             side,
             price,
