@@ -40,6 +40,7 @@ pub struct PositionManagerConfig {
     pub var_limit: Decimal,
 
     // Defines the maximum allowable drawdown before halting trading
+    // not used
     pub max_drawdown: Decimal,
 
     // ensure the risk-adjusted returns meet a certain threshold. Maintain balance between risk and return.
@@ -89,8 +90,6 @@ impl PositionManager {
     pub fn make_decision(&mut self, portfolio: &mut Portfolio, risk: &PortfolioRisk, signal: &Signal, current_price: Decimal) -> Result<TradeDecision, PositionManagerError> {
         // Check if we're within our risk tolerance
         if !self.is_within_risk_tolerance(&risk) {
-            info!("Signal ignored: outside of risk tolerance");
-            info!("{:?}", risk);
             return Ok(TradeDecision::DoNothing)
         }
 
@@ -107,10 +106,22 @@ impl PositionManager {
             return true;
         }
 
-        risk.total_position_value <= self.config.max_position_size
-            && risk.value_at_risk <= self.config.var_limit
-            && risk.beta <= self.config.max_beta
-            && risk.sharpe_ratio >= self.config.min_sharpe_ratio
+        let max_position = risk.total_position_value <= self.config.max_position_size;
+        let var_limit = risk.value_at_risk <= self.config.var_limit;
+        let beta = risk.beta <= self.config.max_beta;
+        let sharpe_ratio = risk.sharpe_ratio >= self.config.min_sharpe_ratio;
+
+        if !max_position {
+            warn!("Max position size exceeded: {}", risk.total_position_value);
+        } else if !var_limit {
+            warn!("VaR limit exceeded: {}", risk.value_at_risk);
+        } else if !beta {
+            warn!("Beta limit exceeded: {}", risk.beta);
+        } else if !sharpe_ratio {
+            warn!("Sharpe ratio below minimum: {}", risk.sharpe_ratio);
+        }
+
+        max_position && var_limit && beta && sharpe_ratio
     }
 
     /// calculates the available risk capacity based on the difference between the maximum allowed portfolio risk and current VaR.
