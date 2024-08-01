@@ -142,6 +142,9 @@ impl BacktestingRunner {
                     portfolio.add_executed_trade(executed);
                 }
 
+                // print basic statistics
+                print_portfolio(&portfolio);
+
                 Ok(())
             } else {
                 // TODO: return err for no indicators
@@ -152,4 +155,11 @@ impl BacktestingRunner {
             todo!()
         }
     }
+}
+
+fn print_portfolio(portfolio: &Portfolio) {
+    info!("Number of open positions: {}", portfolio.get_open_positions().len());
+    info!("Total open quantity: {}", portfolio.total_open_quantity());
+    info!("Total open value: {}", portfolio.total_position_value());
+    info!("Total positions: {}", portfolio.get_executed_trades().len());
 }

@@ -5,6 +5,7 @@
 ### Code Changes
 
 - Show date ranges upon backtesting
+- Show portfolio at the end of backtesting
 
 ---
 
