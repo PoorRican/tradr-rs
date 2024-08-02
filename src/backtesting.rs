@@ -3,6 +3,7 @@ use log::info;
 use polars::prelude::*;
 use crate::manager::{PositionManager, PositionManagerConfig, PositionManagerError, TradeDecision};
 use crate::portfolio::{Portfolio, PortfolioArgs, PositionHandlers, TradeHandlers};
+use crate::processor::CandleProcessor;
 use crate::risk::{calculate_risk, RiskCalculationErrors};
 use crate::strategies::Strategy;
 use crate::types::{ExecutedTrade, FutureTrade, Side, Signal};

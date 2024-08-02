@@ -26,6 +26,7 @@ pub use bbands::BBands;
 
 use crate::types::Signal;
 use polars::prelude::*;
+use crate::processor::CandleProcessor;
 
 #[derive(Debug)]
 pub enum SignalExtractionError {
@@ -158,56 +159,6 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
 pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     fn get_name(&self) -> &'static str;
 
-    /// Process existing candle data
-    ///
-    /// This is the main interface for processing existing candle data. It is meant to be called once
-    /// at the beginning of the runtime for bootstrapping historical data, or for backtesting.
-    ///
-    /// # Arguments
-    /// * `candles` - Historical candle data
-    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
-        match self.process_graph(candles) {
-            Ok(_) => {}
-            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
-        };
-
-        match self.process_signals(candles) {
-            Ok(_) => {}
-            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
-        }
-
-        Ok(())
-    }
-
-    /// Process new candle data
-    ///
-    /// This is the main interface for processing new candle data. It is meant to be called with
-    /// new candle data as it is received from the market.
-    ///
-    /// # Arguments
-    /// * `candles` - New candle data. Should be larger than processing window.
-    ///
-    /// # Panics
-    /// * If the DataFrame does not contain more than one row
-    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
-        assert!(
-            candles.height() > 1,
-            "DataFrame must contain more than one row"
-        );
-
-        match self.process_graph(candles) {
-            Ok(_) => {}
-            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
-        };
-
-        match self.process_signals(candles) {
-            Ok(_) => {}
-            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
-        }
-
-        Ok(())
-    }
-
     /// Get the last signal
     ///
     /// Sort is not internally guaranteed.
@@ -249,4 +200,59 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
 
     /// Save indicator graph as CSV
     fn save_graph_as_csv(&mut self, path: &str) -> Result<(), PolarsError>;
+}
+
+impl CandleProcessor for dyn Indicator {
+    type ErrorType = IndicatorProcessingError;
+
+    /// Process existing candle data
+    ///
+    /// This is the main interface for processing existing candle data. It is meant to be called once
+    /// at the beginning of the runtime for bootstrapping historical data, or for backtesting.
+    ///
+    /// # Arguments
+    /// * `candles` - Historical candle data
+    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
+        match self.process_graph(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
+        };
+
+        match self.process_signals(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
+        }
+
+        Ok(())
+    }
+
+    /// Process new candle data
+    ///
+    /// This is the main interface for processing new candle data. It is meant to be called with
+    /// new candle data as it is received from the market.
+    ///
+    /// # Arguments
+    /// * `candles` - New candle data. Should be larger than processing window.
+    ///
+    /// # Panics
+    /// * If the DataFrame does not contain more than one row
+    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
+        assert!(
+            candles.height() > 1,
+            "DataFrame must contain more than one row"
+        );
+
+        match self.process_graph(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
+        };
+
+        match self.process_signals(candles) {
+            Ok(_) => {}
+            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
+        }
+
+        Ok(())
+    }
+
 }
