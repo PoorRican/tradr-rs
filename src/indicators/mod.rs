@@ -148,12 +148,12 @@ trait IndicatorSignalHandler: IndicatorGraphHandler {
 /// # Sequence of Operations
 ///
 /// For normal runtime, the sequence of operations is as follows:
-/// 1. [`Indicator::process_existing()`] is called to process historical candle data at the beginning of the runtime.
-/// 2. [`Indicator::process_new()`] is called to process new candle data as it is received from the market.
+/// 1. [`Indicator::process_historical_candles()`] is called to process historical candle data at the beginning of the runtime.
+/// 2. [`Indicator::process_new_candles()`] is called to process new candle data as it is received from the market.
 /// 3. [`Indicator::get_last_signal()`] is called to determine whether to attempt a trade.
 ///
 /// For backtesting, the sequence of operations is as follows:
-/// 1. [`Indicator::process_existing()`] is called to process historical candle data.
+/// 1. [`Indicator::process_historical_candles()`] is called to process historical candle data.
 /// 2. [`Indicator::get_signals()`] is called to get all the processed signal history.
 pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     fn get_name(&self) -> &'static str;
@@ -165,7 +165,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     ///
     /// # Arguments
     /// * `candles` - Historical candle data
-    fn process_existing(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
+    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
         match self.process_graph(candles) {
             Ok(_) => {}
             Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
@@ -189,7 +189,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     ///
     /// # Panics
     /// * If the DataFrame does not contain more than one row
-    fn process_new(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
+    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), IndicatorProcessingError> {
         assert!(
             candles.height() > 1,
             "DataFrame must contain more than one row"

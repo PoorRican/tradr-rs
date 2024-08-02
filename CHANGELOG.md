@@ -7,6 +7,7 @@
 - Show date ranges upon backtesting
 - Show portfolio at the end of backtesting
 - Automatically export candles and graph data to CSV
+- Rename `bootstrap` functions to `process_historical_candles`
 
 ---
 

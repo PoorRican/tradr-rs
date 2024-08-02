@@ -13,6 +13,9 @@ type IndicatorContainer = Vec<Box<dyn Indicator>>;
 ///
 /// A simple interface is provided for bootstrapping historical candle data, processing new candle data,
 /// and generating a consensus [`Signal`] among all [`Indicator`] objects.
+///
+/// `Strategy::process_historical_candles` is used for bootstrapping the indicators with historical data.
+/// `Strategy::process_new_candles` is used for ingesting new candle data and generating a consensus signal.
 pub struct Strategy {
     pub indicators: IndicatorContainer,
     consensus: Consensus,
@@ -32,10 +35,10 @@ impl Strategy {
     ///
     /// This method is used upon initial load, or during backtesting.
     // TODO: return errors
-    pub fn bootstrap(&mut self, data: &DataFrame) {
+    pub fn process_historical_candles(&mut self, data: &DataFrame) {
         // todo: check for correct columns of candle data
         for indicator in self.indicators.iter_mut() {
-            indicator.process_existing(data);
+            indicator.process_historical_candles(data);
         }
     }
 
@@ -53,9 +56,9 @@ impl Strategy {
     /// # Panics
     /// * If the DataFrame does not contain exactly one new row
     // TODO: return errors
-    pub fn process(&mut self, row: &DataFrame) -> Signal {
+    pub fn process_new_candles(&mut self, row: &DataFrame) -> Signal {
         for indicator in self.indicators.iter_mut() {
-            indicator.process_new(row);
+            indicator.process_new_candles(row);
         }
 
         self.get_last_signal()
