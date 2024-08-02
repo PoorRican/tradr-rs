@@ -2,6 +2,9 @@
 
 ## v0.3.2
 
+### Code Changes
+
+- Add `data` dir to `.gitignore`
 
 ---
 
