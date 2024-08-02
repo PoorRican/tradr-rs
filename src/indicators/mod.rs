@@ -246,4 +246,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
     fn get_graph(&self) -> Option<&DataFrame> {
         self.get_indicator_history()
     }
+
+    /// Save indicator graph as CSV
+    fn save_graph_as_csv(&mut self, path: &str) -> Result<(), PolarsError>;
 }

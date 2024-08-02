@@ -7,6 +7,7 @@ use crate::portfolio::PortfolioArgs;
 
 use polars::prelude::*;
 use rust_decimal_macros::dec;
+use crate::markets::utils::save_candles;
 
 mod backtesting;
 mod indicators;
@@ -88,4 +89,25 @@ fn main() {
     println!("Avg. processing time per row: {:?}", elapsed / candle_len as u32);
 
     println!("Performance: {:?}", performance);
+
+
+    // save candles and indicator graphs as CSV
+
+    info!("Saving data to CSV");
+
+    let candle_path = format!("data/{}.csv", candle_table);
+    let market_data_path = format!("data/{}.csv", market_data_table);
+    let bbands_path = "data/bbands_graph.csv";
+
+    // create mutable versions of the DataFrames
+    let mut candles = candles.clone();
+    let mut market_data = market_data.clone();
+
+    // save candles to CSV
+    save_candles(&mut candles, &candle_path).unwrap();
+    save_candles(&mut market_data, &market_data_path).unwrap();
+
+    // save indicator graph as CSV
+    let mut bbands = runner.get_strategy_as_mut().indicators[0].as_mut();
+    let bbands_graph = bbands.save_graph_as_csv(bbands_path).unwrap();
 }

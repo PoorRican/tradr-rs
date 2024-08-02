@@ -319,6 +319,15 @@ impl Indicator for BBands {
     fn get_name(&self) -> &'static str {
         "bbands"
     }
+
+    fn save_graph_as_csv(&mut self, path: &str) -> Result<(), PolarsError> {
+        // TODO: raise error if graph is None
+        if let Some(graph) = self.graph.as_mut() {
+            let mut file = std::fs::File::create(path).unwrap();
+            CsvWriter::new(&mut file).finish(graph)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

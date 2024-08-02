@@ -155,6 +155,14 @@ impl BacktestingRunner {
             todo!()
         }
     }
+
+    pub fn get_strategy(&self) -> &Strategy {
+        &self.strategy
+    }
+
+    pub fn get_strategy_as_mut(&mut self) -> &mut Strategy {
+        &mut self.strategy
+    }
 }
 
 fn print_portfolio(portfolio: &Portfolio) {
