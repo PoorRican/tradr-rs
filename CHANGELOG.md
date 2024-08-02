@@ -8,6 +8,7 @@
 - Show portfolio at the end of backtesting
 - Automatically export candles and graph data to CSV
 - Rename `bootstrap` functions to `process_historical_candles`
+- Return `Result` from `Strategy.process_new_candles` and `Strategy.process_historical_candles`
 
 ---
 

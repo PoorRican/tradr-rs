@@ -53,7 +53,7 @@ impl BacktestingRunner {
         }
 
         // process historical data
-        self.strategy.process_historical_candles(candles);
+        self.strategy.process_historical_candles(candles).unwrap();
 
         // initialize portfolio
         let start_time = candles.column("time").unwrap().datetime().unwrap().get(0).unwrap();
