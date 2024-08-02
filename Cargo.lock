@@ -2563,7 +2563,7 @@ dependencies = [
 
 [[package]]
 name = "tradr"
-version = "0.3.0"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "base64 0.13.1",
