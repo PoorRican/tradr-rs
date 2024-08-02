@@ -3,6 +3,7 @@ use log::info;
 use polars::prelude::*;
 use crate::manager::{PositionManager, PositionManagerConfig, PositionManagerError, TradeDecision};
 use crate::portfolio::{Portfolio, PortfolioArgs, PositionHandlers, TradeHandlers};
+use crate::processor::CandleProcessor;
 use crate::risk::{calculate_risk, RiskCalculationErrors};
 use crate::strategies::Strategy;
 use crate::types::{ExecutedTrade, FutureTrade, Side, Signal};
@@ -53,7 +54,7 @@ impl BacktestingRunner {
         }
 
         // process historical data
-        self.strategy.bootstrap(candles);
+        self.strategy.process_historical_candles(candles).unwrap();
 
         // initialize portfolio
         let start_time = candles.column("time").unwrap().datetime().unwrap().get(0).unwrap();
@@ -142,6 +143,9 @@ impl BacktestingRunner {
                     portfolio.add_executed_trade(executed);
                 }
 
+                // print basic statistics
+                print_portfolio(&portfolio);
+
                 Ok(())
             } else {
                 // TODO: return err for no indicators
@@ -152,4 +156,19 @@ impl BacktestingRunner {
             todo!()
         }
     }
+
+    pub fn get_strategy(&self) -> &Strategy {
+        &self.strategy
+    }
+
+    pub fn get_strategy_as_mut(&mut self) -> &mut Strategy {
+        &mut self.strategy
+    }
+}
+
+fn print_portfolio(portfolio: &Portfolio) {
+    info!("Number of open positions: {}", portfolio.get_open_positions().len());
+    info!("Total open quantity: {}", portfolio.total_open_quantity());
+    info!("Total open value: {}", portfolio.total_position_value());
+    info!("Total positions: {}", portfolio.get_executed_trades().len());
 }

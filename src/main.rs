@@ -1,9 +1,13 @@
 use std::time::Instant;
+use chrono::{DateTime, NaiveDateTime};
 use log::info;
 use crate::traits::AsDataFrame;
-use rust_decimal_macros::dec;
 use crate::backtesting::BacktestingRunner;
 use crate::portfolio::PortfolioArgs;
+
+use polars::prelude::*;
+use rust_decimal_macros::dec;
+use crate::markets::utils::save_candles;
 
 mod backtesting;
 mod indicators;
@@ -17,7 +21,7 @@ mod types;
 mod utils;
 mod risk;
 mod manager;
-
+mod processor;
 
 fn main() {
     colog::init();
@@ -60,9 +64,50 @@ fn main() {
     let performance = runner.run(&candles, &market_data).unwrap();
     let elapsed = start_time.elapsed();
 
+    // print candle statistics
+    let candle_start = candles.column("time")
+        .unwrap()
+        .datetime()
+        .unwrap()
+        .head(Some(1))
+        .get(0)
+        .unwrap();
+    let candle_start = DateTime::from_timestamp_millis(candle_start).unwrap().naive_utc();
+    let candle_end = candles.column("time")
+        .unwrap()
+        .datetime()
+        .unwrap()
+        .tail(Some(1))
+        .get(0)
+        .unwrap();
+    let candle_end = DateTime::from_timestamp_millis(candle_end).unwrap().naive_utc();
+
+    info!("Candles range: {:?} - {:?}", candle_start, candle_end);
+
     let candle_len = candles.height();
     println!("Finished processing {:?} rows in {:?}", candle_len, elapsed);
     println!("Avg. processing time per row: {:?}", elapsed / candle_len as u32);
 
     println!("Performance: {:?}", performance);
+
+
+    // save candles and indicator graphs as CSV
+
+    info!("Saving data to CSV");
+
+    let candle_path = format!("data/{}.csv", candle_table);
+    let market_data_path = format!("data/{}.csv", market_data_table);
+    let bbands_path = "data/bbands_graph.csv";
+
+    // create mutable versions of the DataFrames
+    let mut candles = candles.clone();
+    let mut market_data = market_data.clone();
+
+    // save candles to CSV
+    save_candles(&mut candles, &candle_path).unwrap();
+    save_candles(&mut market_data, &market_data_path).unwrap();
+
+    // save indicator graph as CSV
+    let mut bbands = runner.get_strategy_as_mut().indicators[0].as_mut();
+    let bbands_graph = bbands.save_graph_as_csv(bbands_path).unwrap();
 }
