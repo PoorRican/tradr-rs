@@ -6,6 +6,7 @@ use sqlite::Connection;
 use std::env::temp_dir;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
+use log::info;
 use polars::error::PolarsResult;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
@@ -116,6 +117,53 @@ pub fn extract_side_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<V
             Side::from(value.unwrap())
         }).collect())
 }
+
+
+/// Uses the `info!` macro to print the start and end time of the candles
+pub fn print_candle_statistics(candles: &DataFrame) {
+    let candle_start = candles.column("time")
+        .unwrap()
+        .datetime()
+        .unwrap()
+        .head(Some(1))
+        .get(0)
+        .unwrap();
+    let candle_start = DateTime::from_timestamp_millis(candle_start).unwrap().naive_utc();
+    let candle_end = candles.column("time")
+        .unwrap()
+        .datetime()
+        .unwrap()
+        .tail(Some(1))
+        .get(0)
+        .unwrap();
+    let candle_end = DateTime::from_timestamp_millis(candle_end).unwrap().naive_utc();
+
+    info!("Candles range: {:?} - {:?}", candle_start, candle_end);
+}
+
+#[derive(Debug)]
+pub enum AlignmentError {
+    DifferentLengths,
+    TimestampsNotAligned,
+}
+
+pub fn check_candle_alignment(a: &DataFrame, b: &DataFrame) -> Result<(), AlignmentError> {
+    // ensure that the market data and historical data are sorted by timestamp
+    let market_data_index = a.column("time").unwrap().datetime().unwrap();
+    let historical_data_index = b.column("time").unwrap().datetime().unwrap();
+    if market_data_index.len() != historical_data_index.len() {
+        return Err(AlignmentError::DifferentLengths)
+    }
+    let index_alignment_mask: Vec<bool> = market_data_index.iter().zip(historical_data_index.iter()).map(|(a, b)| {
+        a != b
+    }).collect();
+    if index_alignment_mask.iter().any(|&x| x) {
+        return Err(AlignmentError::TimestampsNotAligned)
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::utils::extract_new_rows;

@@ -15,6 +15,7 @@ use crate::portfolio::tracked::TrackedValue;
 use chrono::{Duration, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use serde::{Deserialize, Serialize};
 use ta::Open;
 use crate::types::{ExecutedTrade, FailedTrade};
 
@@ -58,6 +59,7 @@ pub const DEFAULT_THRESHOLD: Decimal = dec!(0.5);
 ///
 /// let portfolio = Portfolio::from_args(&args, NaiveDateTime::from_timestamp(0, 0));
 /// ```
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PortfolioArgs {
     pub assets: Decimal,
     pub capital: Decimal,

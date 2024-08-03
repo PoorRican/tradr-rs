@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.3.2
+
+### Code Changes
+
+- Add `data` dir to `.gitignore`
+- Create some utils to clean and better organize `main.rs` and `backtesting.rs`
+- Read backtesting config from a TOML file
+- Add documentation to `PositionManagerConfig` fields
+
+---
+
 ## v0.3.1
 
 ### Code Changes
