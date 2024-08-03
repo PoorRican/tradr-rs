@@ -1,3 +1,4 @@
+use std::path::Path;
 use chrono::{DateTime};
 use log::info;
 use polars::prelude::*;
@@ -8,15 +9,11 @@ use crate::risk::{calculate_risk, RiskCalculationErrors};
 use crate::strategies::Strategy;
 use crate::types::{ExecutedTrade, FutureTrade, Side, Signal};
 use crate::utils;
-
+use crate::utils::{AlignmentError, check_candle_alignment};
 
 #[derive(Debug)]
 pub enum BacktestingErrors {
-    // The market data and historical data have different lengths
-    CandleDataHasDifferentLengths,
-
-    // The market data and historical data are not aligned by the same timestamp index
-    CandleTimestampsNotAligned,
+    AlignmentError(AlignmentError),
 
     RiskCalculationError(RiskCalculationErrors),
     DecisionError(PositionManagerError),
@@ -41,17 +38,8 @@ impl BacktestingRunner {
     pub fn run(&mut self, candles: &DataFrame, market_history: &DataFrame) -> Result<(), BacktestingErrors> {
         info!("Checking candle data and market data alignment");
         // ensure that the market data and historical data are sorted by timestamp
-        let market_data_index = market_history.column("time").unwrap().datetime().unwrap();
-        let historical_data_index = candles.column("time").unwrap().datetime().unwrap();
-        if market_data_index.len() != historical_data_index.len() {
-            return Err(BacktestingErrors::CandleDataHasDifferentLengths)
-        }
-        let index_alignment_mask: Vec<bool> = market_data_index.iter().zip(historical_data_index.iter()).map(|(a, b)| {
-            a != b
-        }).collect();
-        if index_alignment_mask.iter().any(|&x| x) {
-            return Err(BacktestingErrors::CandleTimestampsNotAligned)
-        }
+        let _ = check_candle_alignment(&candles, &market_history)
+            .map_err(|e| BacktestingErrors::AlignmentError(e));
 
         // process historical data
         self.strategy.process_historical_candles(candles).unwrap();
@@ -84,7 +72,6 @@ impl BacktestingRunner {
                 // convert to vector of candles and signals
                 let candles_vec = utils::extract_candles_from_df(&combined).unwrap();
                 let sides: Vec<Signal> = utils::extract_signals_from_df(&combined, "signals").unwrap();
-
 
                 let rows = candles_vec.iter().zip(sides.iter());
 
@@ -120,6 +107,7 @@ impl BacktestingRunner {
 
                     let current_price = candle.close;
 
+                    // make decision based on risk, signals and current market conditions
                     let decision = position_manager.make_decision(&mut portfolio, &risk, signal, current_price)
                         .map_err(|e| {
                             info!("Error making decision: {:?}", e);
@@ -163,6 +151,23 @@ impl BacktestingRunner {
 
     pub fn get_strategy_as_mut(&mut self) -> &mut Strategy {
         &mut self.strategy
+    }
+
+    /// Write all indicator graphs to a specific dir
+    ///
+    /// # Arguments
+    /// * `dir` - The path to save the indicator graph files
+    pub fn save_indicator_data(&mut self, dir: &str) -> Result<(), PolarsError> {
+        let dir_path = Path::new(dir);
+
+        for indicator in self.strategy.indicators.iter_mut() {
+            let mut indicator = indicator.as_mut();
+            let file_name = format!("{}_graph.csv", indicator.get_name());
+            let path = dir_path.join(file_name);
+            let path = path.to_str().unwrap();
+            indicator.save_graph_as_csv(path)?;
+        }
+        Ok(())
     }
 }
 

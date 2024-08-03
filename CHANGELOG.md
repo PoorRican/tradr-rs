@@ -5,6 +5,7 @@
 ### Code Changes
 
 - Add `data` dir to `.gitignore`
+- Create some utils to clean and better organize `main.rs` and `backtesting.rs`
 
 ---
 
