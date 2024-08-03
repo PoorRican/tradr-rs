@@ -25,7 +25,7 @@ pub enum PositionManagerError {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PositionManagerConfig {
-    // limits the size of any single position
+    // limits the total allowable capital allocated to open positions
     pub max_position_size: Decimal,
 
     // Sets the percentage loss at which to exit a position
