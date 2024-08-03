@@ -6,6 +6,7 @@
 
 - Add `data` dir to `.gitignore`
 - Create some utils to clean and better organize `main.rs` and `backtesting.rs`
+- Read backtesting config from a TOML file
 
 ---
 

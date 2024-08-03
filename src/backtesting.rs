@@ -2,6 +2,7 @@ use std::path::Path;
 use chrono::{DateTime};
 use log::info;
 use polars::prelude::*;
+use serde::Deserialize;
 use crate::manager::{PositionManager, PositionManagerConfig, PositionManagerError, TradeDecision};
 use crate::portfolio::{Portfolio, PortfolioArgs, PositionHandlers, TradeHandlers};
 use crate::processor::CandleProcessor;
@@ -10,6 +11,12 @@ use crate::strategies::Strategy;
 use crate::types::{ExecutedTrade, FutureTrade, Side, Signal};
 use crate::utils;
 use crate::utils::{AlignmentError, check_candle_alignment};
+
+#[derive(Deserialize, Debug)]
+pub struct BacktestingConfig {
+    portfolio: PortfolioArgs,
+    risk: PositionManagerConfig,
+}
 
 #[derive(Debug)]
 pub enum BacktestingErrors {
@@ -31,6 +38,17 @@ impl BacktestingRunner {
             portfolio_args,
             strategy,
             manager_config
+        }
+    }
+
+    pub fn from_config(config_path: &str, strategy: Strategy) -> Self {
+        let config_str = std::fs::read_to_string(config_path).unwrap();
+        let config: BacktestingConfig = toml::from_str(&config_str).unwrap();
+
+        BacktestingRunner {
+            portfolio_args: config.portfolio,
+            strategy,
+            manager_config: config.risk,
         }
     }
 

@@ -8,6 +8,7 @@ use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use thiserror::Error;
 use log::{info, warn};
+use serde::{Deserialize, Serialize};
 use crate::portfolio::{CapitalHandlers, Portfolio, PositionHandlers};
 use crate::risk::{PortfolioRisk};
 use crate::types::{Candle, Side, Signal, Trade};
@@ -22,7 +23,7 @@ pub enum PositionManagerError {
     InvalidPositionSize(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PositionManagerConfig {
     // limits the size of any single position
     pub max_position_size: Decimal,
@@ -41,6 +42,7 @@ pub struct PositionManagerConfig {
 
     // Defines the maximum allowable drawdown before halting trading
     // not used
+    #[serde(default)]
     pub max_drawdown: Decimal,
 
     // ensure the risk-adjusted returns meet a certain threshold. Maintain balance between risk and return.

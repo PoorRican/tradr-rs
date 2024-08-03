@@ -2,7 +2,7 @@ use std::time::Instant;
 use chrono::{DateTime, NaiveDateTime};
 use log::info;
 use crate::traits::AsDataFrame;
-use crate::backtesting::BacktestingRunner;
+use crate::backtesting::{BacktestingConfig, BacktestingRunner};
 use crate::portfolio::PortfolioArgs;
 
 use polars::prelude::*;
@@ -39,25 +39,9 @@ fn main() {
         strategies::Consensus::Unison,
     );
 
-    let portfolio_args = PortfolioArgs {
-        assets: dec!(0.0),
-        capital: dec!(100.0),
-        threshold: dec!(0.0),
-        ..Default::default()
-    };
-    let manager_config = manager::PositionManagerConfig {
-        max_position_size: dec!(100.0),
-        stop_loss_percentage: dec!(0.05),
-        take_profit_percentage: dec!(0.1),
-        max_beta: dec!(1.4),
-        var_limit: dec!(10.0),
-        min_sharpe_ratio: dec!(0.4),
-        ..Default::default()
-    };
-    let mut runner = BacktestingRunner::new(
-        strategy,
-        portfolio_args,
-        manager_config,
+    let mut runner = BacktestingRunner::from_config(
+        "data/backtesting_config.toml",
+        strategy
     );
 
     let start_time = Instant::now();
