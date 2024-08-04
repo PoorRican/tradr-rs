@@ -27,7 +27,7 @@ pub const VALID_INTERVALS: [&str; 6] = ["1m", "5m", "15m", "1h", "6h", "1d"];
 fn append_candles(existing: &DataFrame, new_candles: DataFrame) -> PolarsResult<DataFrame> {
     let appended = existing.vstack(&new_candles)?;
 
-    let mut unique =
+    let unique =
         appended.unique_stable(Some(&["time".to_string()]), UniqueKeepStrategy::Last, None)?;
 
     unique.sort(

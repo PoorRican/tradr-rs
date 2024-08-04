@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## v0.4.0
+
+Massively change the API for setting up backtesting. Now, there is an object `MarketData` which is able to read all candles
+for a given asset class from the candle database. `BacktestingRuntime` now accepts the name for the traded asset, the name
+for the market data asset, and the intraday frequency.
+
+The internal API for `BacktestingRuntime` has been simplified by storing the actual candle `DataFrame` objects used by the
+runtime as fields of the `BacktestingRuntime` struct. The function `BacktestingRuntime::load_candles` is a builder function
+which loads all candle data into the runtime and calls `self.strategy.load_historical_candles()` to process the data. This
+change allows the user to have more control over the backtesting process and allows the internal functions to be independent
+of the `BacktestingRuntime::run` function.
+
+### Code Changes
+
+- Simplify `BacktestingRuntime::run`
+- Rename `BacktestingRunner` to `BacktestingRuntime`
+- Add documentation to `BacktestingRuntime`
+- Simplify API for internal `BacktestingRuntime` functions and add more flexibility.
+- Create a function `trim_candles` to remove candles outside the backtesting date range
+
+### New Structures
+
+- Create a type `MarketData`
+
+---
+
 ## v0.3.2
 
 ### Code Changes

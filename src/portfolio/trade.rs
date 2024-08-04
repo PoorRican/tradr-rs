@@ -3,11 +3,9 @@ use crate::portfolio::assets::AssetHandlers;
 use crate::portfolio::capital::CapitalHandlers;
 use crate::portfolio::position::PositionHandlers;
 use crate::portfolio::Portfolio;
-use crate::traits::AsDataFrame;
 use crate::types::{Candle, ExecutedTrade, FailedTrade, FutureTrade, Side, Trade};
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal_macros::dec;
 
 /// Interface methods for storing and retrieving trades, and determining when to trade
@@ -119,10 +117,6 @@ impl TradeHandlers for Portfolio {
 
 fn calculate_buy_rate(candle: &Candle) -> Decimal {
     ((candle.close * dec!(2.0)) + candle.high + candle.open) / dec!(4.0)
-}
-
-fn calculate_sell_rate(candle: &Candle) -> Decimal {
-    ((candle.close * dec!(2.0)) + candle.low + candle.open) / dec!(4.0)
 }
 
 #[cfg(test)]

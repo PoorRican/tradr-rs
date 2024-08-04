@@ -12,15 +12,12 @@ pub use trade::TradeHandlers;
 
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::{NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
-use ta::Open;
 use crate::types::{ExecutedTrade, FailedTrade};
 
-pub const DEFAULT_LIMIT: usize = 4;
-pub const DEFAULT_TIMEOUT_MINUTES: i64 = 60 * 2;
 pub const DEFAULT_THRESHOLD: Decimal = dec!(0.5);
 
 /// Arguments for creating a new portfolio via the [`Portfolio::from_args`] constructor
