@@ -217,8 +217,6 @@ impl BacktestingRuntime {
 
         self.print_statistics(elapsed, &portfolio);
 
-        self.save_data();
-
         Ok(())
     }
 
@@ -311,7 +309,7 @@ impl BacktestingRuntime {
         info!("Avg. processing time per row: {:?}", duration / candle_len as u32);
     }
 
-    fn save_data(&mut self) {
+    pub fn save_data(&mut self) {
         // save trading assets
         let path = format!("data/{}_{}.csv", self.trading_config.trading_asset, self.trading_config.frequency);
         save_candles(self.trading_candles.as_mut().unwrap(), &path).unwrap();

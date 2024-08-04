@@ -29,4 +29,7 @@ fn main() {
 
     info!("Starting to process");
     runtime.run().unwrap();
+
+    // Save runtime data
+    runtime.save_data();
 }
