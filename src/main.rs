@@ -2,7 +2,7 @@ use std::time::Instant;
 use chrono::{DateTime, NaiveDateTime};
 use log::info;
 use crate::traits::AsDataFrame;
-use crate::backtesting::{BacktestingConfig, BacktestingRunner};
+use crate::backtesting::{BacktestingConfig, BacktestingRuntime};
 use crate::portfolio::PortfolioArgs;
 
 use polars::prelude::*;
@@ -33,11 +33,11 @@ fn main() {
         strategies::Consensus::Unison,
     );
 
-    let mut runner = BacktestingRunner::from_config(
+    let mut runtime = BacktestingRuntime::from_config(
         "data/backtesting_config.toml",
         strategy
     );
 
     info!("Starting to process");
-    runner.run().unwrap();
+    runtime.run().unwrap();
 }

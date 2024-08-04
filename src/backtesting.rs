@@ -41,7 +41,7 @@ pub enum BacktestingErrors {
     DecisionError(PositionManagerError),
 }
 
-pub struct BacktestingRunner {
+pub struct BacktestingRuntime {
     strategy: Strategy,
     portfolio_args: PortfolioArgs,
     manager_config: PositionManagerConfig,
@@ -51,7 +51,7 @@ pub struct BacktestingRunner {
     trading_candle_data: Option<MarketData>,
 }
 
-impl BacktestingRunner {
+impl BacktestingRuntime {
     pub fn new<S: Into<String>>(
         strategy: Strategy, portfolio_args: PortfolioArgs, manager_config: PositionManagerConfig,
         frequency: S, trading_asset: S, market_asset: S
@@ -60,7 +60,7 @@ impl BacktestingRunner {
         let trading_asset = trading_asset.into();
         let market_asset = market_asset.into();
 
-        BacktestingRunner {
+        BacktestingRuntime {
             portfolio_args,
             strategy,
             manager_config,
@@ -81,7 +81,7 @@ impl BacktestingRunner {
         let market_candle_data = MarketData::from_db(&config.trading.market_asset).into();
         let trading_candle_data = MarketData::from_db(&config.trading.trading_asset).into();
 
-        BacktestingRunner {
+        BacktestingRuntime {
             portfolio_args: config.portfolio,
             strategy,
             manager_config: config.risk,
