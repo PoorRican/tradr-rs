@@ -25,7 +25,7 @@ fn main() {
     let mut runtime = BacktestingRuntime::from_config(
         "data/backtesting_config.toml",
         strategy
-    );
+    ).load_candles().expect("Could not load candles");
 
     info!("Starting to process");
     runtime.run().unwrap();

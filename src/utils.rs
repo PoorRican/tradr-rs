@@ -1,7 +1,6 @@
 use crate::types::{Candle, Side, Signal};
-use chrono::DateTime;
-use polars::frame::DataFrame;
-use polars::prelude::{DataFrameJoinOps, JoinArgs, JoinType};
+use chrono::{DateTime, NaiveDateTime};
+use polars::prelude::*;
 use sqlite::Connection;
 use std::env::temp_dir;
 use std::fs::{create_dir_all, remove_dir_all};
@@ -162,6 +161,16 @@ pub fn check_candle_alignment(a: &DataFrame, b: &DataFrame) -> Result<(), Alignm
     }
 
     Ok(())
+}
+
+
+pub fn trim_candles(candles: &DataFrame, end_time: NaiveDateTime, length: IdxSize) -> DataFrame {
+    candles.clone()
+        .lazy()
+        .filter(col("time").lt(lit(end_time)))
+        .tail(length)
+        .collect()
+        .unwrap()
 }
 
 #[cfg(test)]

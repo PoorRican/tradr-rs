@@ -12,7 +12,9 @@ use crate::risk::{calculate_risk, RiskCalculationErrors};
 use crate::strategies::Strategy;
 use crate::types::{Candle, ExecutedTrade, FutureTrade, MarketData, MarketDataError, Side, Signal};
 use crate::utils;
-use crate::utils::{AlignmentError, check_candle_alignment, print_candle_statistics};
+use crate::utils::{AlignmentError, check_candle_alignment, print_candle_statistics, trim_candles};
+
+const CANDLE_TRIM_SIZE: IdxSize = 100;
 
 /// Total configuration for backtesting
 ///
@@ -36,6 +38,7 @@ pub struct TradingConfig {
 
 #[derive(Debug)]
 pub enum BacktestingErrors {
+    APIError(String),
     CandleError(MarketDataError),
     /// Raised when unable to extract signals from trading asset data
     SignalExtractionError,
@@ -51,8 +54,15 @@ pub struct BacktestingRuntime {
     manager_config: PositionManagerConfig,
     trading_config: TradingConfig,
 
+    /// Global candle references
     market_candle_data: Option<MarketData>,
     trading_candle_data: Option<MarketData>,
+
+    /// Usable candles for market data
+    market_candles: Option<DataFrame>,
+
+    /// Usable candles for trading data
+    trading_candles: Option<DataFrame>,
 }
 
 impl BacktestingRuntime {
@@ -75,6 +85,8 @@ impl BacktestingRuntime {
             },
             market_candle_data: None,
             trading_candle_data: None,
+            market_candles: None,
+            trading_candles: None,
         }
     }
 
@@ -87,17 +99,33 @@ impl BacktestingRuntime {
         let config_str = std::fs::read_to_string(config_path).unwrap();
         let config: BacktestingConfig = toml::from_str(&config_str).unwrap();
 
-        let market_candle_data = MarketData::from_db(&config.trading.market_asset).into();
-        let trading_candle_data = MarketData::from_db(&config.trading.trading_asset).into();
-
         BacktestingRuntime {
             portfolio_args: config.portfolio,
             strategy,
             manager_config: config.risk,
             trading_config: config.trading,
-            market_candle_data,
-            trading_candle_data,
+            market_candle_data: None,
+            trading_candle_data: None,
+            market_candles: None,
+            trading_candles: None,
         }
+    }
+
+    pub fn load_candles(mut self) -> Result<Self, BacktestingErrors> {
+        // load candle data
+        self.market_candle_data = MarketData::from_db(&self.trading_config.market_asset).into();
+        self.trading_candle_data = MarketData::from_db(&self.trading_config.trading_asset).into();
+
+        // compute indicator graph
+        let trading_candles = self.get_trading_asset()?.to_owned();
+
+        self.strategy.process_historical_candles(&trading_candles).unwrap();
+
+        // populate market and trading candles
+        self.trading_candles = trading_candles.into();
+        self.market_candles = self.get_market_asset()?.to_owned().into();
+
+        Ok(self)
     }
 
     fn get_trading_asset(&self) -> Result<&DataFrame, BacktestingErrors> {
@@ -106,7 +134,7 @@ impl BacktestingRuntime {
                 .get_candles(&self.trading_config.frequency)
                 .map_err(|e| BacktestingErrors::CandleError(e))
         } else {
-            Err(BacktestingErrors::CandleError(MarketDataError::FrequencyNotFound))
+            Err(BacktestingErrors::APIError("`trading_candle_data` is None".to_string()))
         }
     }
 
@@ -116,51 +144,41 @@ impl BacktestingRuntime {
                 .get_candles(&self.trading_config.frequency)
                 .map_err(|e| BacktestingErrors::CandleError(e))
         } else {
-            Err(BacktestingErrors::CandleError(MarketDataError::FrequencyNotFound))
+            Err(BacktestingErrors::APIError("`market_candle_data` is None".to_string()))
         }
     }
 
     /// Run the backtesting simulation
     pub fn run(&mut self) -> Result<(), BacktestingErrors> {
-        // retrieve historical data
-        let mut candles = self.get_trading_asset()?.to_owned();
-        let mut market_history = self.get_market_asset()?.to_owned();
+        // ensure that candles are set
+        if self.trading_candles.is_none() || self.market_candles.is_none() {
+            return Err(BacktestingErrors::APIError("Candle data is None".to_string()));
+        }
 
         // ensure that the market data and historical data are sorted by timestamp
         info!("Checking candle data and market data alignment");
-        let _ = check_candle_alignment(&candles, &market_history)
+        let _ = check_candle_alignment(self.trading_candles.as_ref().unwrap(), self.market_candles.as_ref().unwrap())
             .map_err(|e| BacktestingErrors::AlignmentError(e));
 
-        let mut portfolio = self.initialize_portfolio(&candles);
+        let mut portfolio = self.initialize_portfolio()?;
 
         // initialize position manager
         let mut position_manager = PositionManager::new(self.manager_config.clone());
 
         // process historical data
-        let (relevant_candles, signals) = self.get_relevant_signals(&candles.clone())?;
+        let (relevant_candles, signals) = self.get_relevant_signals()?;
 
         // begin trading simulation
         let start_time = Instant::now();
         for (candle, signal) in relevant_candles.iter().zip(signals.iter()) {
-            // trim candle data
-            let trimmed_candles = candles.clone()
-                .lazy()
-                .filter(col("time").lt(lit(candle.time)))
-                .tail(100)
-                .collect()
-                .unwrap();
-            if trimmed_candles.height() == 0 {
+            let trimmed_trading_candles = trim_candles(self.trading_candles.as_ref().unwrap(), candle.time, CANDLE_TRIM_SIZE);
+            if trimmed_trading_candles.height() == 0 {
                 continue;
             }
-            let trimmed_candles = utils::extract_candles_from_df(&trimmed_candles).unwrap();
+            let trimmed_candles = utils::extract_candles_from_df(&trimmed_trading_candles).unwrap();
 
             // trim market data
-            let trimmed_market = market_history.clone()
-                .lazy()
-                .filter(col("time").lt(lit(candle.time)))
-                .tail(100)
-                .collect()
-                .unwrap();
+            let trimmed_market = trim_candles(&self.market_candles.as_ref().unwrap(), candle.time, CANDLE_TRIM_SIZE);
             let trimmed_market = utils::extract_candles_from_df(&trimmed_market).unwrap();
 
             // calculate current portfolio risk metrics
@@ -197,9 +215,9 @@ impl BacktestingRuntime {
         }
         let elapsed = start_time.elapsed();
 
-        self.print_statistics(&candles, elapsed, &portfolio);
+        self.print_statistics(elapsed, &portfolio);
 
-        self.save_data(&mut candles, &mut market_history);
+        self.save_data();
 
         Ok(())
     }
@@ -231,17 +249,16 @@ impl BacktestingRuntime {
     ///
     /// # Arguments
     /// * `candles` - Candles to use for signal generation
-    fn get_relevant_signals(&mut self, candles: &DataFrame) -> Result<(Vec<Candle>, Vec<Signal>), BacktestingErrors> {
-        self.strategy.process_historical_candles(candles).unwrap();
-
+    fn get_relevant_signals(&mut self) -> Result<(Vec<Candle>, Vec<Signal>), BacktestingErrors> {
         // generate signals
         let signals =  self.strategy.get_combined_signals()
             .map_err(|_| BacktestingErrors::SignalExtractionError)?;
         let signals = signals.unwrap();
 
         // join signals column with candles df
-        let combined = candles
+        let combined = self.trading_candles
             .clone()
+            .unwrap()
             .lazy()
             .join(
                 signals.lazy(),
@@ -265,10 +282,14 @@ impl BacktestingRuntime {
     ///
     /// # Arguments
     /// * `candles` - The historical candles used to initialize the portfolio. Used to extract the starting time.
-    fn initialize_portfolio(&self, candles: &DataFrame) -> Portfolio {
-        let start_time = candles.column("time").unwrap().datetime().unwrap().get(0).unwrap();
-        let start_time = DateTime::from_timestamp_millis(start_time).unwrap().naive_utc();
-        Portfolio::from_args(&self.portfolio_args, start_time)
+    fn initialize_portfolio(&self) -> Result<Portfolio, BacktestingErrors> {
+        if let Some(candles) = self.trading_candles.as_ref() {
+            let start_time = candles.column("time").unwrap().datetime().unwrap().get(0).unwrap();
+            let start_time = DateTime::from_timestamp_millis(start_time).unwrap().naive_utc();
+            Ok(Portfolio::from_args(&self.portfolio_args, start_time))
+        } else {
+            Err(BacktestingErrors::APIError("Trading candles are None".to_string()))
+        }
     }
 
     /// Print statistics about the backtesting run
@@ -277,9 +298,11 @@ impl BacktestingRuntime {
     /// * `candles` - Only candle length is used, so any candle [`DataFrame`] can be passed.
     /// * `duration` - The duration of the backtesting run
     /// * `portfolio` - The portfolio after the backtesting run
-    fn print_statistics(&self, candles: &DataFrame, duration: Duration, portfolio: &Portfolio) {
+    fn print_statistics(&self, duration: Duration, portfolio: &Portfolio) {
         // print basic statistics
         print_portfolio(portfolio);
+
+        let candles = self.trading_candles.as_ref().unwrap();
 
         print_candle_statistics(candles);
 
@@ -288,14 +311,14 @@ impl BacktestingRuntime {
         info!("Avg. processing time per row: {:?}", duration / candle_len as u32);
     }
 
-    fn save_data(&mut self, trading_asset_candles: &mut DataFrame, market_asset_candles: &mut DataFrame) {
+    fn save_data(&mut self) {
         // save trading assets
         let path = format!("data/{}_{}.csv", self.trading_config.trading_asset, self.trading_config.frequency);
-        save_candles(trading_asset_candles, &path).unwrap();
+        save_candles(self.trading_candles.as_mut().unwrap(), &path).unwrap();
 
         // save market data
         let path = format!("data/{}_{}.csv", self.trading_config.market_asset, self.trading_config.frequency);
-        save_candles(market_asset_candles, &path).unwrap();
+        save_candles(self.market_candles.as_mut().unwrap(), &path).unwrap();
 
         // save strategy indicator data
         self.save_indicator_data("data").unwrap()

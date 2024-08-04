@@ -11,7 +11,7 @@ use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use crate::portfolio::{CapitalHandlers, Portfolio, PositionHandlers};
 use crate::risk::{PortfolioRisk};
-use crate::types::Trade;
+use crate::types::{Signal, Trade};
 
 #[derive(Error, Debug)]
 pub enum PositionManagerError {
