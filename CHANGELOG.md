@@ -2,6 +2,17 @@
 
 ## v0.4.0
 
+Massively change the API for setting up backtesting. Now, there is an object `MarketData` which is able to read all candles
+for a given asset class from the candle database. `BacktestingRunner` now accepts the name for the traded asset, the name
+for the market data asset, and the intraday frequency.
+
+### Code Changes
+
+- Simplify `BacktestingRunner::run`
+
+### New Structures
+
+- Create a type `MarketData`
 
 ---
 
