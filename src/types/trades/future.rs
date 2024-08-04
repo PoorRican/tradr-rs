@@ -1,9 +1,7 @@
-use crate::traits::AsDataFrame;
 use crate::types::signals::Side;
 use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 
 /// Represents a potential trade to be executed
 #[derive(Clone, Debug, PartialEq)]

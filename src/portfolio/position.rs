@@ -3,9 +3,7 @@ use crate::portfolio::{OpenPosition, Portfolio};
 use crate::types::Side;
 use crate::types::{ExecutedTrade, Trade};
 use chrono::NaiveDateTime;
-use polars::prelude::*;
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 
 /// Tracking and management of open positions
 pub trait PositionHandlers {

@@ -1,6 +1,4 @@
-use std::iter::Zip;
 use std::path::Path;
-use std::slice::Iter;
 use std::time::{Instant, Duration};
 use chrono::{DateTime};
 use log::info;
@@ -206,14 +204,6 @@ impl BacktestingRuntime {
         Ok(())
     }
 
-    pub fn get_strategy(&self) -> &Strategy {
-        &self.strategy
-    }
-
-    pub fn get_strategy_as_mut(&mut self) -> &mut Strategy {
-        &mut self.strategy
-    }
-
     /// Write all indicator graphs to a specific dir
     ///
     /// # Arguments
@@ -222,7 +212,7 @@ impl BacktestingRuntime {
         let dir_path = Path::new(dir);
 
         for indicator in self.strategy.indicators.iter_mut() {
-            let mut indicator = indicator.as_mut();
+            let indicator = indicator.as_mut();
             let file_name = format!("{}_graph.csv", indicator.get_name());
             let path = dir_path.join(file_name);
             let path = path.to_str().unwrap();

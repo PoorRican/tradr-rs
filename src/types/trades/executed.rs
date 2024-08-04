@@ -2,9 +2,7 @@ use crate::types::signals::Side;
 use crate::types::trades::future::FutureTrade;
 use crate::types::trades::{calc_notional_value, Trade};
 use chrono::NaiveDateTime;
-use polars::prelude::{NamedFrom, Series};
 use rust_decimal::Decimal;
-use rust_decimal::prelude::FromPrimitive;
 
 /// Represents a trade that has been executed on the market
 #[derive(Debug, Clone, PartialEq)]

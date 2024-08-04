@@ -1,15 +1,5 @@
-use std::time::Instant;
-use chrono::{DateTime, NaiveDateTime};
 use log::info;
-use crate::traits::AsDataFrame;
-use crate::backtesting::{BacktestingConfig, BacktestingRuntime};
-use crate::portfolio::PortfolioArgs;
-
-use polars::prelude::*;
-use rust_decimal_macros::dec;
-use crate::markets::utils::save_candles;
-use crate::types::MarketData;
-use crate::utils::print_candle_statistics;
+use crate::backtesting::BacktestingRuntime;
 
 mod backtesting;
 mod indicators;
@@ -17,7 +7,6 @@ mod markets;
 mod portfolio;
 mod serialization;
 mod strategies;
-mod timing;
 mod traits;
 mod types;
 mod utils;
