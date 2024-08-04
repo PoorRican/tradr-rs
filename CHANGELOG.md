@@ -10,6 +10,7 @@ for the market data asset, and the intraday frequency.
 
 - Simplify `BacktestingRuntime::run`
 - Rename `BacktestingRunner` to `BacktestingRuntime`
+- Add documentation to `BacktestingRuntime`
 
 ### New Structures
 

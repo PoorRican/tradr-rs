@@ -16,6 +16,9 @@ use crate::types::{Candle, ExecutedTrade, FutureTrade, MarketData, MarketDataErr
 use crate::utils;
 use crate::utils::{AlignmentError, check_candle_alignment, print_candle_statistics};
 
+/// Total configuration for backtesting
+///
+/// Meant to be read from a TOML config file
 #[derive(Deserialize, Debug)]
 pub struct BacktestingConfig {
     portfolio: PortfolioArgs,
@@ -23,6 +26,9 @@ pub struct BacktestingConfig {
     trading: TradingConfig,
 }
 
+/// Contains trading config data for backtesting
+///
+/// Meant to be read from a TOML config file
 #[derive(Deserialize, Debug)]
 pub struct TradingConfig {
     frequency: String,
@@ -74,6 +80,11 @@ impl BacktestingRuntime {
         }
     }
 
+    /// Read the backtesting configuration from the given TOML file
+    ///
+    /// # Arguments
+    /// * `config_path` - The path to the TOML config file
+    /// * `strategy` - The strategy to use for backtesting
     pub fn from_config(config_path: &str, strategy: Strategy) -> Self {
         let config_str = std::fs::read_to_string(config_path).unwrap();
         let config: BacktestingConfig = toml::from_str(&config_str).unwrap();
