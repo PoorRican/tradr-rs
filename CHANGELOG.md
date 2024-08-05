@@ -20,6 +20,7 @@ forecasting models.
 - Rename `CandleProcessor::process_historical_candles()` to `process_candles`
 - Change `CandleProcessor::process_candles()` to return `Result<Self::ReturnType, Self::ErrorType>`
 - Remove `Indicator` trait. `CandleProcessor` for indicators now returns a `Signal`.
+- Modify `BacktestingRuntime::run` to evaluate all candles
 
 ---
 
