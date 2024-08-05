@@ -2,6 +2,9 @@
 
 ## v0.5.1
 
+### New Features
+
+- Show P&L at the end of backtesting
 
 ---
 

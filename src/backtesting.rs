@@ -3,10 +3,11 @@ use std::time::{Instant, Duration};
 use chrono::{DateTime};
 use log::info;
 use polars::prelude::*;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use crate::manager::{PositionManager, PositionManagerConfig, PositionManagerError, TradeDecision};
 use crate::markets::utils::save_candles;
-use crate::portfolio::{Portfolio, PortfolioArgs, PositionHandlers, TradeHandlers};
+use crate::portfolio::{CapitalHandlers, Portfolio, PortfolioArgs, PositionHandlers, TradeHandlers};
 use crate::processor::CandleProcessor;
 use crate::risk::{calculate_risk, RiskCalculationErrors};
 use crate::strategies::Strategy;
@@ -244,7 +245,7 @@ impl BacktestingRuntime {
     /// * `portfolio` - The portfolio after the backtesting run
     fn print_statistics(&self, duration: Duration, portfolio: &Portfolio) {
         // print basic statistics
-        print_portfolio(portfolio);
+        print_portfolio(portfolio, self.portfolio_args.capital);
 
         let candles = self.trading_candles.as_ref().unwrap();
 
@@ -266,9 +267,10 @@ impl BacktestingRuntime {
     }
 }
 
-fn print_portfolio(portfolio: &Portfolio) {
+fn print_portfolio(portfolio: &Portfolio, starting_capital: Decimal) {
     info!("Number of open positions: {}", portfolio.get_open_positions().len());
     info!("Total open quantity: {}", portfolio.total_open_quantity());
     info!("Total open value: {}", portfolio.total_position_value());
     info!("Total positions: {}", portfolio.get_executed_trades().len());
+    info!("Profit: {}", portfolio.available_capital() - starting_capital);
 }
