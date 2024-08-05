@@ -214,7 +214,7 @@ impl CandleProcessor for dyn Indicator {
     ///
     /// # Arguments
     /// * `candles` - Historical candle data
-    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
+    fn process_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
         match self.process_graph(candles) {
             Ok(_) => {}
             Err(e) => return Err(IndicatorProcessingError::GraphError(e)),

@@ -119,7 +119,7 @@ impl BacktestingRuntime {
         // compute indicator graph
         let trading_candles = self.get_trading_asset()?.to_owned();
 
-        self.strategy.process_historical_candles(&trading_candles).unwrap();
+        self.strategy.process_candles(&trading_candles).unwrap();
 
         // populate market and trading candles
         self.trading_candles = trading_candles.into();

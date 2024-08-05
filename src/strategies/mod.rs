@@ -36,9 +36,9 @@ impl CandleProcessor for Strategy {
     /// data in the indicators is overwritten.
     ///
     /// This method is used upon initial load, or during backtesting.
-    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
+    fn process_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
         for indicator in self.indicators.iter_mut() {
-            indicator.process_historical_candles(candles)
+            indicator.process_candles(candles)
                 .map_err(|x| StrategyError::IndicatorError(x))?;
         }
         Ok(())

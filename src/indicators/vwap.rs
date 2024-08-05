@@ -86,7 +86,7 @@ impl Indicator for VWAP {
 impl CandleProcessor for VWAP {
     type ErrorType = IndicatorProcessingError;
 
-    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
+    fn process_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
         self.process_graph(candles).map_err(|e| IndicatorProcessingError::GraphError(e))
     }
 }

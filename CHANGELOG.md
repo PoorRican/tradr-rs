@@ -15,6 +15,7 @@ forecasting models.
 ### Code Changes
 
 - Remove `Candle::process_new_candles`
+- Rename `CandleProcessor::process_historical_candles()` to `process_candles`
 
 ---
 
