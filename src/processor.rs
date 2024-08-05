@@ -6,5 +6,6 @@ use polars::prelude::DataFrame;
 pub trait CandleProcessor {
     type ReturnType;
     type ErrorType;
-    fn process_candles(&mut self, candles: &DataFrame) -> Result<Self::ReturnType, Self::ErrorType>;
+    fn process_candle(&self, candles: &DataFrame) -> Result<Self::ReturnType, Self::ErrorType>;
+    fn get_name(&self) -> &'static str;
 }

@@ -30,6 +30,7 @@ use crate::types::Signal;
 use polars::prelude::*;
 use crate::processor::CandleProcessor;
 
+#[deprecated(since="0.5.0", note="Create a new error enum")]
 #[derive(Debug)]
 pub enum SignalExtractionError {
     InvalidSeriesLength,
@@ -39,6 +40,7 @@ pub enum SignalExtractionError {
     CandlesEmpty,
 }
 
+#[deprecated(since="0.5.0", note="Create a new error enum")]
 #[derive(Debug)]
 pub enum SignalProcessingError {
     GraphHistoryMissing,
@@ -57,6 +59,7 @@ pub enum GraphProcessingError {
     InsufficientCandleData,
 }
 
+#[deprecated(since="0.5.0", note="Create a new error enum")]
 #[derive(Debug)]
 pub enum IndicatorProcessingError {
     GraphError(GraphProcessingError),
@@ -202,30 +205,4 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
 
     /// Save indicator graph as CSV
     fn save_graph_as_csv(&mut self, path: &str) -> Result<(), PolarsError>;
-}
-
-impl CandleProcessor for dyn Indicator {
-    type ReturnType = ();
-    type ErrorType = IndicatorProcessingError;
-
-    /// Process existing candle data
-    ///
-    /// This is the main interface for processing existing candle data. It is meant to be called once
-    /// at the beginning of the runtime for bootstrapping historical data, or for backtesting.
-    ///
-    /// # Arguments
-    /// * `candles` - Historical candle data
-    fn process_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
-        match self.process_graph(candles) {
-            Ok(_) => {}
-            Err(e) => return Err(IndicatorProcessingError::GraphError(e)),
-        };
-
-        match self.process_signals(candles) {
-            Ok(_) => {}
-            Err(e) => return Err(IndicatorProcessingError::SignalError(e)),
-        }
-
-        Ok(())
-    }
 }

@@ -8,6 +8,8 @@ calculated and the signal is returned to the caller. This change allows for a mo
 and simplifies creating new indicators.
 
 This means that _every_ candle will be processed during backtesting, more closely resembling a live trading environment.
+The increase in processing time is negligible due to recalculating such a small window, and using `polars` (which
+is highly optimized) to calculate the indicator data.
 
 These changes are necessary to implement the `VWAP` indicator, and eventually, other complex indicators such as time-series
 forecasting models.
@@ -17,6 +19,7 @@ forecasting models.
 - Remove `Candle::process_new_candles`
 - Rename `CandleProcessor::process_historical_candles()` to `process_candles`
 - Change `CandleProcessor::process_candles()` to return `Result<Self::ReturnType, Self::ErrorType>`
+- Remove `Indicator` trait. `CandleProcessor` for indicators now returns a `Signal`.
 
 ---
 
