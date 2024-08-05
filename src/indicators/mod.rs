@@ -20,9 +20,11 @@
 /// # Notes
 /// Due to the nature of candle data as it is received, there is no sorting that is performed internally.
 mod bbands;
+mod vwap;
 
 // Re-exports
 pub use bbands::BBands;
+pub use vwap::VWAP;
 
 use crate::types::Signal;
 use polars::prelude::*;

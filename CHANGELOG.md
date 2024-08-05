@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v0.4.1
+
+### New Features
+
+- Implement VWAP indicator
+
+### Code Changes
+
+- Explicitly call `save_data` in `BacktestingRuntime` instead of automatically calling it in `run`
+
+---
+
 ## v0.4.0
 
 Massively change the API for setting up backtesting. Now, there is an object `MarketData` which is able to read all candles

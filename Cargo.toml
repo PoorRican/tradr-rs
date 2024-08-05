@@ -1,6 +1,6 @@
 [package]
 name = "tradr"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,7 +10,7 @@ async-trait = { version = "0.1.75", features = [] }
 base64 = "0.13.1"
 chrono = { version = "0.4.38", features = [] }
 csv = "1.1.6"
-polars = { version = "0.41.3", features = ["temporal", "lazy", "semi_anti_join", "dtype-struct", "rolling_window"] }
+polars = { version = "0.41.3", features = ["temporal", "lazy", "semi_anti_join", "dtype-struct", "rolling_window", "cum_agg"] }
 polars-io = { version = "0.41.3", features = ["csv"] }
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
