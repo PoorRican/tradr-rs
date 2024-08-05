@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## v0.5.0
+
+Massive changes to the way indicators are handled only using the `CandleProcessor` interface. This eliminates internal
+tracking of the `graph` and `signals` fields in the indicator instances. All signals from indicators are now immediately
+calculated and the signal is returned to the caller. This change allows for a more flexible way to handle complex indicators,
+and simplifies creating new indicators.
+
+This means that _every_ candle will be processed during backtesting, more closely resembling a live trading environment.
+The increase in processing time is negligible due to recalculating such a small window, and using `polars` (which
+is highly optimized) to calculate the indicator data.
+
+These changes are necessary to implement the `VWAP` indicator, and eventually, other complex indicators such as time-series
+forecasting models.
+
+### Code Changes
+
+- Remove `Candle::process_new_candles`
+- Rename `CandleProcessor::process_historical_candles()` to `process_candles`
+- Change `CandleProcessor::process_candles()` to return `Result<Self::ReturnType, Self::ErrorType>`
+- Remove `Indicator` trait. `CandleProcessor` for indicators now returns a `Signal`.
+- Modify `BacktestingRuntime::run` to evaluate all candles
+
+---
+
 ## v0.4.1
 
 ### New Features

@@ -1,97 +1,46 @@
 use polars::prelude::*;
-use crate::indicators::{GraphProcessingError, Indicator, IndicatorGraphHandler, IndicatorProcessingError, IndicatorSignalHandler, IndicatorUtilities, SignalExtractionError, SignalProcessingError};
+use crate::indicators::GraphProcessingError;
 use crate::processor::CandleProcessor;
+use crate::types::Signal;
 
 /// The Volume Weighted Average Price (VWAP) indicator
-///
-/// Note that this will _NOT_ work with the way that `Indicator` is structured.
 pub struct VWAP {
     /// The window size for the VWAP calculation
     window: usize,
-
-    graph: Option<DataFrame>,
-    signals: Option<DataFrame>,
 }
 
 impl VWAP {
     pub fn new(window: usize) -> Self {
         Self {
             window,
-            graph: None,
-            signals: None
         }
-    }
-}
-
-impl IndicatorUtilities for VWAP {
-    fn restart_indicator(&mut self) {
-        self.graph = None;
-        self.signals = None;
-    }
-}
-
-impl IndicatorGraphHandler for VWAP {
-    fn process_graph(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError> {
-        let graph = calculate_vwap(candles, self.window)
-            .map_err(|e| GraphProcessingError::DataFrameError(e))?;
-
-        self.graph = Some(graph);
-
-        Ok(())
-    }
-
-    fn process_graph_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), GraphProcessingError> {
-        todo!()
-    }
-
-    fn get_indicator_history(&self) -> Option<&DataFrame> {
-        self.graph.as_ref()
-    }
-}
-
-impl IndicatorSignalHandler for VWAP {
-    fn process_signals(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError> {
-        // TODO!
-        Ok(())
-    }
-
-    fn process_signals_for_new_candles(&mut self, candles: &DataFrame) -> Result<(), SignalProcessingError> {
-        todo!()
-    }
-
-    fn get_signal_history(&self) -> Option<&DataFrame> {
-        todo!()
-    }
-
-    fn extract_signals(&self, graph: &DataFrame, candles: &DataFrame) -> Result<DataFrame, SignalExtractionError> {
-        todo!()
-    }
-}
-
-impl Indicator for VWAP {
-    fn get_name(&self) -> &'static str {
-        "vwap"
-    }
-
-    fn save_graph_as_csv(&mut self, path: &str) -> Result<(), PolarsError> {
-        // TODO: raise error if graph is None
-        if let Some(graph) = self.graph.as_mut() {
-            let mut file = std::fs::File::create(path).unwrap();
-            CsvWriter::new(&mut file).finish(graph)?;
-        }
-        Ok(())
     }
 }
 
 impl CandleProcessor for VWAP {
-    type ErrorType = IndicatorProcessingError;
+    type ReturnType = Signal;
+    type ErrorType = GraphProcessingError;
 
-    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
-        self.process_graph(candles).map_err(|e| IndicatorProcessingError::GraphError(e))
+    fn process_candle(&self, candles: &DataFrame) -> Result<Self::ReturnType, Self::ErrorType> {
+        let graph = calculate_vwap(candles, self.window)
+            .map_err(|e| GraphProcessingError::DataFrameError(e))?;
+
+        let current_price = candles.column("close").unwrap().f64().unwrap().get(candles.height() - 1).unwrap();
+
+        let last_vwap = graph.column("vwap").unwrap().f64().unwrap().get(graph.height() - 1).unwrap();
+
+        let signal = if current_price > last_vwap {
+            Signal::Buy
+        } else if current_price < last_vwap {
+            Signal::Sell
+        } else {
+            Signal::Hold
+        };
+        Ok(signal)
     }
 
-    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
-        todo!()
+    fn get_name(&self) -> &'static str {
+        "vwap"
     }
 }
 

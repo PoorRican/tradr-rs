@@ -4,7 +4,8 @@ use polars::prelude::DataFrame;
 ///
 /// Implemented by `Strategy` and `Indicator` objects
 pub trait CandleProcessor {
+    type ReturnType;
     type ErrorType;
-    fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType>;
-    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType>;
+    fn process_candle(&self, candles: &DataFrame) -> Result<Self::ReturnType, Self::ErrorType>;
+    fn get_name(&self) -> &'static str;
 }
