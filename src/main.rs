@@ -18,7 +18,10 @@ fn main() {
     colog::init();
 
     let strategy = strategies::Strategy::new(
-        vec![Box::new(indicators::BBands::default())],
+        vec![
+            Box::new(indicators::BBands::default()),
+            Box::new(indicators::VWAP::new(5)),
+        ],
         strategies::Consensus::Unison,
     );
 

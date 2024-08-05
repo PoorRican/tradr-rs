@@ -68,8 +68,6 @@ fn calculate_vwap(candles: &DataFrame, window: usize) -> Result<DataFrame, Polar
             (col("typical_price") * col("volume")).cum_sum(false).alias("cum_tp_vol")
         ]).collect()?;
 
-    println!("{:?}", df);
-
     // Calculate VWAP
     df.lazy()
         .select([

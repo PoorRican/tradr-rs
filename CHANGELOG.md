@@ -6,6 +6,10 @@
 
 - Show P&L at the end of backtesting
 
+### Code Changes
+
+- Implement `VWAP` indicator in main example
+
 ---
 
 ## v0.5.0
