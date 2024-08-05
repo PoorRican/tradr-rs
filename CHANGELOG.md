@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.5.1
+
+
+---
+
 ## v0.5.0
 
 Massive changes to the way indicators are handled only using the `CandleProcessor` interface. This eliminates internal
