@@ -6,5 +6,4 @@ use polars::prelude::DataFrame;
 pub trait CandleProcessor {
     type ErrorType;
     fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType>;
-    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType>;
 }

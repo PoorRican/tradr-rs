@@ -12,6 +12,10 @@ This means that _every_ candle will be processed during backtesting, more closel
 These changes are necessary to implement the `VWAP` indicator, and eventually, other complex indicators such as time-series
 forecasting models.
 
+### Code Changes
+
+- Remove `Candle::process_new_candles`
+
 ---
 
 ## v0.4.1

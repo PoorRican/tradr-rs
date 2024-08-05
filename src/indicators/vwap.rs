@@ -89,10 +89,6 @@ impl CandleProcessor for VWAP {
     fn process_historical_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
         self.process_graph(candles).map_err(|e| IndicatorProcessingError::GraphError(e))
     }
-
-    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
-        todo!()
-    }
 }
 
 fn calculate_vwap(candles: &DataFrame, window: usize) -> Result<DataFrame, PolarsError> {

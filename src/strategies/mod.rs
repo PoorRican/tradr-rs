@@ -43,21 +43,6 @@ impl CandleProcessor for Strategy {
         }
         Ok(())
     }
-
-    /// Process a new candle and generate a consensus [`Signal`] among the [`Indicator`] objects.
-    ///
-    /// Internally, the dataframe is propagated to all internal indicators, and the resulting
-    /// signals are gathered. A consensus is then reached between the signals, and returned.
-    ///
-    /// # Arguments
-    /// * `row` - The new candle data to process
-    fn process_new_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType> {
-        for indicator in self.indicators.iter_mut() {
-            indicator.process_new_candles(candles)
-                .map_err(|x| StrategyError::IndicatorError(x))?;
-        }
-        Ok(())
-    }
 }
 
 impl Strategy {
