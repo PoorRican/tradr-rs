@@ -4,6 +4,7 @@ use polars::prelude::DataFrame;
 ///
 /// Implemented by `Strategy` and `Indicator` objects
 pub trait CandleProcessor {
+    type ReturnType;
     type ErrorType;
-    fn process_candles(&mut self, candles: &DataFrame) -> Result<(), Self::ErrorType>;
+    fn process_candles(&mut self, candles: &DataFrame) -> Result<Self::ReturnType, Self::ErrorType>;
 }

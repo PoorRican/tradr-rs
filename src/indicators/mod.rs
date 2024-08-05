@@ -205,6 +205,7 @@ pub trait Indicator: IndicatorGraphHandler + IndicatorSignalHandler {
 }
 
 impl CandleProcessor for dyn Indicator {
+    type ReturnType = ();
     type ErrorType = IndicatorProcessingError;
 
     /// Process existing candle data

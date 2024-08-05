@@ -16,6 +16,7 @@ forecasting models.
 
 - Remove `Candle::process_new_candles`
 - Rename `CandleProcessor::process_historical_candles()` to `process_candles`
+- Change `CandleProcessor::process_candles()` to return `Result<Self::ReturnType, Self::ErrorType>`
 
 ---
 
