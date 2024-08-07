@@ -1,9 +1,9 @@
-use std::collections::BTreeMap;
 use crate::portfolio::{OpenPosition, Portfolio};
 use crate::types::Side;
 use crate::types::{ExecutedTrade, Trade};
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
+use std::collections::BTreeMap;
 
 /// Tracking and management of open positions
 pub trait PositionHandlers {
@@ -52,10 +52,12 @@ impl PositionHandlers for Portfolio {
             return None;
         }
 
-        Some(self.open_positions.keys()
-            .map(
-                |x| self.executed_trades.get(x).unwrap()
-            ).collect::<Vec<_>>())
+        Some(
+            self.open_positions
+                .keys()
+                .map(|x| self.executed_trades.get(x).unwrap())
+                .collect::<Vec<_>>(),
+        )
     }
 
     fn get_open_positions(&self) -> &BTreeMap<NaiveDateTime, OpenPosition> {
@@ -79,7 +81,9 @@ impl PositionHandlers for Portfolio {
         sorted_positions.sort_by(|a, b| {
             let profit_a = close_price - a.1.entry_price;
             let profit_b = close_price - b.1.entry_price;
-            profit_b.partial_cmp(&profit_a).unwrap_or(std::cmp::Ordering::Equal)
+            profit_b
+                .partial_cmp(&profit_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         for (timestamp, position) in sorted_positions {
@@ -116,14 +120,16 @@ impl PositionHandlers for Portfolio {
 
     /// Update the average entry price and total notional value of open positions
     fn update_position_metrics(&mut self) {
-        let (total_value, total_cost, total_quantity) = self.open_positions.values()
-            .fold((Decimal::ZERO, Decimal::ZERO, Decimal::ZERO), |acc, position| {
+        let (total_value, total_cost, total_quantity) = self.open_positions.values().fold(
+            (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO),
+            |acc, position| {
                 (
                     acc.0 + position.quantity * position.entry_price,
                     acc.1 + position.quantity * position.entry_price,
-                    acc.2 + position.quantity
+                    acc.2 + position.quantity,
                 )
-            });
+            },
+        );
 
         self.total_position_notional_value = total_value;
         self.average_entry_price = if total_quantity.is_zero() {
@@ -153,15 +159,24 @@ impl PositionHandlers for Portfolio {
 mod tests {
     use super::*;
     use chrono::{NaiveDate, NaiveTime};
+    use rust_decimal_macros::dec;
 
-    fn create_executed_trade(id: &str, side: Side, price: Decimal, quantity: Decimal, timestamp: NaiveDateTime) -> ExecutedTrade {
+    fn create_executed_trade(
+        id: &str,
+        side: Side,
+        price: Decimal,
+        quantity: Decimal,
+        timestamp: NaiveDateTime,
+    ) -> ExecutedTrade {
         ExecutedTrade::with_calculated_notional(id.to_string(), side, price, quantity, timestamp)
     }
 
     #[test]
     fn test_add_open_position() {
         let mut portfolio = Portfolio::default();
-        let timestamp = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp = NaiveDate::from_ymd_opt(2023, 1, 1)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
         let trade = create_executed_trade("1", Side::Buy, dec!(100), dec!(10), timestamp);
 
         portfolio.add_open_position(&trade);
@@ -180,53 +195,81 @@ mod tests {
     #[test]
     fn test_update_position_metrics() {
         let mut portfolio = Portfolio::default();
-        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
 
-        portfolio.open_positions.insert(timestamp1, OpenPosition {
-            entry_price: dec!(100),
-            quantity: dec!(10),
-            entry_time: timestamp1,
-            order_id: "1".to_string(),
-        });
-        portfolio.open_positions.insert(timestamp2, OpenPosition {
-            entry_price: dec!(110),
-            quantity: dec!(5),
-            entry_time: timestamp2,
-            order_id: "2".to_string(),
-        });
+        portfolio.open_positions.insert(
+            timestamp1,
+            OpenPosition {
+                entry_price: dec!(100),
+                quantity: dec!(10),
+                entry_time: timestamp1,
+                order_id: "1".to_string(),
+            },
+        );
+        portfolio.open_positions.insert(
+            timestamp2,
+            OpenPosition {
+                entry_price: dec!(110),
+                quantity: dec!(5),
+                entry_time: timestamp2,
+                order_id: "2".to_string(),
+            },
+        );
 
         portfolio.update_position_metrics();
 
         assert_eq!(portfolio.total_position_notional_value, dec!(1550)); // (100 * 10) + (110 * 5)
-        assert!(portfolio.average_entry_price > dec!(103.3333) && portfolio.average_entry_price < dec!(103.3334)); // (1000 + 550) / 15
+        assert!(
+            portfolio.average_entry_price > dec!(103.3333)
+                && portfolio.average_entry_price < dec!(103.3334)
+        ); // (1000 + 550) / 15
     }
 
     #[test]
     fn test_close_positions() {
         let mut portfolio = Portfolio::default();
-        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-        let timestamp3 = NaiveDate::from_ymd_opt(2023, 1, 3).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp3 = NaiveDate::from_ymd_opt(2023, 1, 3)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
 
-        portfolio.open_positions.insert(timestamp1, OpenPosition {
-            entry_price: dec!(100),
-            quantity: dec!(10),
-            entry_time: timestamp1,
-            order_id: "1".to_string(),
-        });
-        portfolio.open_positions.insert(timestamp2, OpenPosition {
-            entry_price: dec!(110),
-            quantity: dec!(5),
-            entry_time: timestamp2,
-            order_id: "2".to_string(),
-        });
-        portfolio.open_positions.insert(timestamp3, OpenPosition {
-            entry_price: dec!(90),
-            quantity: dec!(8),
-            entry_time: timestamp3,
-            order_id: "3".to_string(),
-        });
+        portfolio.open_positions.insert(
+            timestamp1,
+            OpenPosition {
+                entry_price: dec!(100),
+                quantity: dec!(10),
+                entry_time: timestamp1,
+                order_id: "1".to_string(),
+            },
+        );
+        portfolio.open_positions.insert(
+            timestamp2,
+            OpenPosition {
+                entry_price: dec!(110),
+                quantity: dec!(5),
+                entry_time: timestamp2,
+                order_id: "2".to_string(),
+            },
+        );
+        portfolio.open_positions.insert(
+            timestamp3,
+            OpenPosition {
+                entry_price: dec!(90),
+                quantity: dec!(8),
+                entry_time: timestamp3,
+                order_id: "3".to_string(),
+            },
+        );
 
         portfolio.update_position_metrics();
 
@@ -247,14 +290,19 @@ mod tests {
     #[test]
     fn test_close_positions_partial() {
         let mut portfolio = Portfolio::default();
-        let timestamp = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp = NaiveDate::from_ymd_opt(2023, 1, 1)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
 
-        portfolio.open_positions.insert(timestamp, OpenPosition {
-            entry_price: dec!(100),
-            quantity: dec!(10),
-            entry_time: timestamp,
-            order_id: "1".to_string(),
-        });
+        portfolio.open_positions.insert(
+            timestamp,
+            OpenPosition {
+                entry_price: dec!(100),
+                quantity: dec!(10),
+                entry_time: timestamp,
+                order_id: "1".to_string(),
+            },
+        );
 
         portfolio.update_position_metrics();
 
@@ -274,21 +322,31 @@ mod tests {
     #[test]
     fn test_close_positions_multiple_partial() {
         let mut portfolio = Portfolio::default();
-        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
-        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2).unwrap().and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp1 = NaiveDate::from_ymd_opt(2023, 1, 1)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+        let timestamp2 = NaiveDate::from_ymd_opt(2023, 1, 2)
+            .unwrap()
+            .and_time(NaiveTime::from_hms_opt(0, 0, 0).unwrap());
 
-        portfolio.open_positions.insert(timestamp1, OpenPosition {
-            entry_price: dec!(100),
-            quantity: dec!(10),
-            entry_time: timestamp1,
-            order_id: "1".to_string(),
-        });
-        portfolio.open_positions.insert(timestamp2, OpenPosition {
-            entry_price: dec!(110),
-            quantity: dec!(5),
-            entry_time: timestamp2,
-            order_id: "2".to_string(),
-        });
+        portfolio.open_positions.insert(
+            timestamp1,
+            OpenPosition {
+                entry_price: dec!(100),
+                quantity: dec!(10),
+                entry_time: timestamp1,
+                order_id: "1".to_string(),
+            },
+        );
+        portfolio.open_positions.insert(
+            timestamp2,
+            OpenPosition {
+                entry_price: dec!(110),
+                quantity: dec!(5),
+                entry_time: timestamp2,
+                order_id: "2".to_string(),
+            },
+        );
 
         portfolio.update_position_metrics();
 

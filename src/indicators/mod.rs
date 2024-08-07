@@ -26,11 +26,11 @@ mod vwap;
 pub use bbands::BBands;
 pub use vwap::VWAP;
 
+use crate::processor::CandleProcessor;
 use crate::types::Signal;
 use polars::prelude::*;
-use crate::processor::CandleProcessor;
 
-#[deprecated(since="0.5.0", note="Create a new error enum")]
+#[deprecated(since = "0.5.0", note = "Create a new error enum")]
 #[derive(Debug)]
 pub enum SignalExtractionError {
     InvalidSeriesLength,
@@ -40,7 +40,7 @@ pub enum SignalExtractionError {
     CandlesEmpty,
 }
 
-#[deprecated(since="0.5.0", note="Create a new error enum")]
+#[deprecated(since = "0.5.0", note = "Create a new error enum")]
 #[derive(Debug)]
 pub enum SignalProcessingError {
     GraphHistoryMissing,
@@ -59,7 +59,7 @@ pub enum GraphProcessingError {
     InsufficientCandleData,
 }
 
-#[deprecated(since="0.5.0", note="Create a new error enum")]
+#[deprecated(since = "0.5.0", note = "Create a new error enum")]
 #[derive(Debug)]
 pub enum IndicatorProcessingError {
     GraphError(GraphProcessingError),

@@ -4,19 +4,19 @@ mod position;
 mod tracked;
 mod trade;
 
-use std::collections::{BTreeMap, HashMap};
 pub use assets::AssetHandlers;
 pub use capital::CapitalHandlers;
 pub use position::PositionHandlers;
+use std::collections::{BTreeMap, HashMap};
 pub use trade::TradeHandlers;
 
 use crate::markets::FeeCalculator;
 use crate::portfolio::tracked::TrackedValue;
+use crate::types::{ExecutedTrade, FailedTrade};
 use chrono::{NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
-use crate::types::{ExecutedTrade, FailedTrade};
 
 pub const DEFAULT_THRESHOLD: Decimal = dec!(0.5);
 
@@ -116,7 +116,6 @@ impl Default for Portfolio {
             fee_calculator: None,
         }
     }
-
 }
 
 impl Portfolio {
@@ -186,6 +185,7 @@ impl Portfolio {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Duration;
     use super::*;
     use crate::portfolio::{assets::AssetHandlers, capital::CapitalHandlers};
     use crate::types::{ExecutedTrade, FailedTrade, FutureTrade, ReasonCode, Side};
@@ -199,7 +199,12 @@ mod tests {
         let point = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let mut portfolio = Portfolio::new(assets, capital, point);
-        let trade = FutureTrade::new(Side::Buy, dec!(100.0), dec!(1.0), point + Duration::seconds(1));
+        let trade = FutureTrade::new(
+            Side::Buy,
+            dec!(100.0),
+            dec!(1.0),
+            point + Duration::seconds(1),
+        );
         let executed_trade = ExecutedTrade::from_future_trade("id".to_string(), trade.clone());
         let failed_trade =
             FailedTrade::with_future_trade(ReasonCode::MarketRejection, trade.clone());

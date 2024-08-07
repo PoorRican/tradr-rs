@@ -1,18 +1,18 @@
-use log::info;
 use crate::backtesting::BacktestingRuntime;
+use log::info;
 
 mod backtesting;
 mod indicators;
+mod manager;
 mod markets;
 mod portfolio;
+mod processor;
+mod risk;
 mod serialization;
 mod strategies;
 mod traits;
 mod types;
 mod utils;
-mod risk;
-mod manager;
-mod processor;
 
 fn main() {
     colog::init();
@@ -25,10 +25,9 @@ fn main() {
         strategies::Consensus::Unison,
     );
 
-    let mut runtime = BacktestingRuntime::from_config(
-        "data/backtesting_config.toml",
-        strategy
-    ).load_candles().expect("Could not load candles");
+    let mut runtime = BacktestingRuntime::from_config("data/backtesting_config.toml", strategy)
+        .load_candles()
+        .expect("Could not load candles");
 
     info!("******************************************\nStarting to process");
     runtime.run().unwrap();

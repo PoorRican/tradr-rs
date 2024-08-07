@@ -1,3 +1,7 @@
+use crate::portfolio::{CapitalHandlers, Portfolio, PositionHandlers};
+use crate::risk::PortfolioRisk;
+use crate::types::{Signal, Trade};
+use log::{info, warn};
 /// # NOTES
 ///
 /// - Implementing dynamic risk limits that adjust based on market conditions or recent performance.
@@ -6,12 +10,8 @@
 /// - Implementing a gradual position building/reduction strategy instead of all-or-nothing decisions.
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
-use thiserror::Error;
-use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use crate::portfolio::{CapitalHandlers, Portfolio, PositionHandlers};
-use crate::risk::{PortfolioRisk};
-use crate::types::{Signal, Trade};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum PositionManagerError {
@@ -60,7 +60,7 @@ impl Default for PositionManagerConfig {
             take_profit_percentage: dec!(0.1),
             max_beta: dec!(1.4),
             var_limit: dec!(10),
-            max_drawdown: dec!(0.2),  // unused
+            max_drawdown: dec!(0.2), // unused
             min_sharpe_ratio: dec!(0.6),
             unrealized_pnl_limit: dec!(1.0),
         }
@@ -73,9 +73,7 @@ pub struct PositionManager {
 
 impl PositionManager {
     pub fn new(config: PositionManagerConfig) -> Self {
-        Self {
-            config,
-        }
+        Self { config }
     }
 
     pub async fn update_config(&mut self, new_config: PositionManagerConfig) {
@@ -89,10 +87,16 @@ impl PositionManager {
         todo!("Portfolio doesn't have a drawdown method yet")
     }
 
-    pub fn make_decision(&mut self, portfolio: &mut Portfolio, risk: &PortfolioRisk, signal: &Signal, current_price: Decimal) -> Result<TradeDecision, PositionManagerError> {
+    pub fn make_decision(
+        &mut self,
+        portfolio: &mut Portfolio,
+        risk: &PortfolioRisk,
+        signal: &Signal,
+        current_price: Decimal,
+    ) -> Result<TradeDecision, PositionManagerError> {
         // Check if we're within our risk tolerance
         if !self.is_within_risk_tolerance(&risk) {
-            return Ok(TradeDecision::DoNothing)
+            return Ok(TradeDecision::DoNothing);
         }
 
         match signal {
@@ -129,7 +133,12 @@ impl PositionManager {
     /// calculates the available risk capacity based on the difference between the maximum allowed portfolio risk and current VaR.
     ///
     /// determines the maximum quantity that can be bought without exceeding this risk capacity.
-    fn process_buy_signal(&self, portfolio: &Portfolio, risk: &PortfolioRisk, current_price: Decimal) -> Result<TradeDecision, PositionManagerError> {
+    fn process_buy_signal(
+        &self,
+        portfolio: &Portfolio,
+        risk: &PortfolioRisk,
+        current_price: Decimal,
+    ) -> Result<TradeDecision, PositionManagerError> {
         // Check if we're within our risk tolerance
         if !self.is_within_risk_tolerance(risk) {
             info!("Buy signal ignored: outside of risk tolerance");
@@ -173,7 +182,12 @@ impl PositionManager {
     /// checks if the unrealized PnL has reached the profit-taking threshold.
     ///
     /// checks if the VaR exceeds the limit and calculates how much to sell to bring the risk back within limits.
-    fn process_sell_signal(&mut self, portfolio: &mut Portfolio, risk: &PortfolioRisk, current_price: Decimal) -> Result<TradeDecision, PositionManagerError> {
+    fn process_sell_signal(
+        &mut self,
+        portfolio: &mut Portfolio,
+        risk: &PortfolioRisk,
+        current_price: Decimal,
+    ) -> Result<TradeDecision, PositionManagerError> {
         let total_quantity = portfolio.total_open_quantity();
 
         if total_quantity == Decimal::ZERO {
@@ -182,7 +196,10 @@ impl PositionManager {
 
         // Check if we've reached the profit-taking threshold
         if risk.unrealized_pnl >= self.config.unrealized_pnl_limit {
-            info!("Taking profit, attempting to sell total quantity: {}", total_quantity);
+            info!(
+                "Taking profit, attempting to sell total quantity: {}",
+                total_quantity
+            );
             let closed_trade_ids = portfolio.close_positions(total_quantity, current_price);
             return Ok(TradeDecision::ExecuteSell(total_quantity, closed_trade_ids));
         }
@@ -192,23 +209,30 @@ impl PositionManager {
             let excess_risk = risk.value_at_risk - self.config.var_limit;
             let sell_quantity = (excess_risk / current_price).min(total_quantity);
 
-            info!("Risk management sell, attempting to sell quantity: {}", sell_quantity);
+            info!(
+                "Risk management sell, attempting to sell quantity: {}",
+                sell_quantity
+            );
             let closed_trade_ids = portfolio.close_positions(sell_quantity, current_price);
             return Ok(TradeDecision::ExecuteSell(sell_quantity, closed_trade_ids));
         }
 
         // Check stop-loss and take-profit for individual positions
-        let open_positions = portfolio.get_open_positions()
-            .clone();       // cloned to allow borrowing as mutable
+        let open_positions = portfolio.get_open_positions().clone(); // cloned to allow borrowing as mutable
         let mut total_sell_quantity = Decimal::ZERO;
         let mut closed_trade_ids = Vec::new();
 
         for (_, position) in open_positions {
-            let stop_loss = position.entry_price * (Decimal::ONE - self.config.stop_loss_percentage);
-            let take_profit = position.entry_price * (Decimal::ONE + self.config.take_profit_percentage);
+            let stop_loss =
+                position.entry_price * (Decimal::ONE - self.config.stop_loss_percentage);
+            let take_profit =
+                position.entry_price * (Decimal::ONE + self.config.take_profit_percentage);
 
             if current_price <= stop_loss || current_price >= take_profit {
-                info!("Stop-loss or take-profit triggered for position: {:?}", position);
+                info!(
+                    "Stop-loss or take-profit triggered for position: {:?}",
+                    position
+                );
                 let ids = portfolio.close_positions(position.quantity, current_price);
                 total_sell_quantity += position.quantity;
                 closed_trade_ids.extend(ids);
@@ -216,7 +240,10 @@ impl PositionManager {
         }
 
         if total_sell_quantity > Decimal::ZERO {
-            return Ok(TradeDecision::ExecuteSell(total_sell_quantity, closed_trade_ids));
+            return Ok(TradeDecision::ExecuteSell(
+                total_sell_quantity,
+                closed_trade_ids,
+            ));
         }
 
         Ok(TradeDecision::DoNothing)
@@ -224,7 +251,7 @@ impl PositionManager {
 }
 
 pub enum TradeDecision {
-    ExecuteBuy(Decimal),  // Quantity to buy
+    ExecuteBuy(Decimal),               // Quantity to buy
     ExecuteSell(Decimal, Vec<String>), // Quantity to sell
     DoNothing,
 }

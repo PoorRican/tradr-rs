@@ -1,14 +1,14 @@
 use crate::types::{Candle, Side, Signal};
 use chrono::{DateTime, NaiveDateTime};
+use log::info;
+use polars::error::PolarsResult;
 use polars::prelude::*;
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use sqlite::Connection;
 use std::env::temp_dir;
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
-use log::info;
-use polars::error::PolarsResult;
-use rust_decimal::Decimal;
-use rust_decimal::prelude::FromPrimitive;
 
 /// create temp dir for testing
 pub fn create_temp_dir(dir: &Path) -> PathBuf {
@@ -72,7 +72,6 @@ pub fn extract_candles_from_db(db_path: &str, table_name: &str) -> Result<Vec<Ca
     Ok(results)
 }
 
-
 pub fn extract_candles_from_df(df: &DataFrame) -> PolarsResult<Vec<Candle>> {
     let time = df.column("time")?.datetime()?;
     let high = df.column("high")?.f64()?;
@@ -83,22 +82,23 @@ pub fn extract_candles_from_df(df: &DataFrame) -> PolarsResult<Vec<Candle>> {
 
     Ok((0..time.len())
         .into_iter()
-        .map(
-        |i| {
-            Candle {
-                time: DateTime::from_timestamp_millis(time.get(i).unwrap()).unwrap().naive_utc(),
-                high: Decimal::from_f64(high.get(i).unwrap()).unwrap(),
-                low: Decimal::from_f64(low.get(i).unwrap()).unwrap(),
-                open: Decimal::from_f64(open.get(i).unwrap()).unwrap(),
-                close: Decimal::from_f64(close.get(i).unwrap()).unwrap(),
-                volume: Decimal::from_f64(volume.get(i).unwrap()).unwrap(),
-            }
-        },
-    ).collect())
+        .map(|i| Candle {
+            time: DateTime::from_timestamp_millis(time.get(i).unwrap())
+                .unwrap()
+                .naive_utc(),
+            high: Decimal::from_f64(high.get(i).unwrap()).unwrap(),
+            low: Decimal::from_f64(low.get(i).unwrap()).unwrap(),
+            open: Decimal::from_f64(open.get(i).unwrap()).unwrap(),
+            close: Decimal::from_f64(close.get(i).unwrap()).unwrap(),
+            volume: Decimal::from_f64(volume.get(i).unwrap()).unwrap(),
+        })
+        .collect())
 }
 
 pub fn extract_signals_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<Vec<Signal>> {
-    Ok(df.column(column_name)?.i8()?
+    Ok(df
+        .column(column_name)?
+        .i8()?
         .into_iter()
         .map(|value| {
             if let Some(value) = value {
@@ -106,36 +106,43 @@ pub fn extract_signals_from_df(df: &DataFrame, column_name: &str) -> PolarsResul
             } else {
                 return Signal::Hold;
             }
-        }).collect())
+        })
+        .collect())
 }
 
 pub fn extract_side_from_df(df: &DataFrame, column_name: &str) -> PolarsResult<Vec<Side>> {
-    Ok(df.column(column_name)?.i8()?
+    Ok(df
+        .column(column_name)?
+        .i8()?
         .into_iter()
-        .map(|value| {
-            Side::from(value.unwrap())
-        }).collect())
+        .map(|value| Side::from(value.unwrap()))
+        .collect())
 }
-
 
 /// Uses the `info!` macro to print the start and end time of the candles
 pub fn print_candle_statistics(candles: &DataFrame) {
-    let candle_start = candles.column("time")
+    let candle_start = candles
+        .column("time")
         .unwrap()
         .datetime()
         .unwrap()
         .head(Some(1))
         .get(0)
         .unwrap();
-    let candle_start = DateTime::from_timestamp_millis(candle_start).unwrap().naive_utc();
-    let candle_end = candles.column("time")
+    let candle_start = DateTime::from_timestamp_millis(candle_start)
+        .unwrap()
+        .naive_utc();
+    let candle_end = candles
+        .column("time")
         .unwrap()
         .datetime()
         .unwrap()
         .tail(Some(1))
         .get(0)
         .unwrap();
-    let candle_end = DateTime::from_timestamp_millis(candle_end).unwrap().naive_utc();
+    let candle_end = DateTime::from_timestamp_millis(candle_end)
+        .unwrap()
+        .naive_utc();
 
     info!("Candles range: {:?} - {:?}", candle_start, candle_end);
 }
@@ -151,21 +158,23 @@ pub fn check_candle_alignment(a: &DataFrame, b: &DataFrame) -> Result<(), Alignm
     let market_data_index = a.column("time").unwrap().datetime().unwrap();
     let historical_data_index = b.column("time").unwrap().datetime().unwrap();
     if market_data_index.len() != historical_data_index.len() {
-        return Err(AlignmentError::DifferentLengths)
+        return Err(AlignmentError::DifferentLengths);
     }
-    let index_alignment_mask: Vec<bool> = market_data_index.iter().zip(historical_data_index.iter()).map(|(a, b)| {
-        a != b
-    }).collect();
+    let index_alignment_mask: Vec<bool> = market_data_index
+        .iter()
+        .zip(historical_data_index.iter())
+        .map(|(a, b)| a != b)
+        .collect();
     if index_alignment_mask.iter().any(|&x| x) {
-        return Err(AlignmentError::TimestampsNotAligned)
+        return Err(AlignmentError::TimestampsNotAligned);
     }
 
     Ok(())
 }
 
-
 pub fn trim_candles(candles: &DataFrame, end_time: NaiveDateTime, length: IdxSize) -> DataFrame {
-    candles.clone()
+    candles
+        .clone()
         .lazy()
         .filter(col("time").lt(lit(end_time)))
         .tail(length)

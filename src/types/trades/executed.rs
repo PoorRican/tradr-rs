@@ -135,7 +135,8 @@ mod test {
         let execution_price = dec!(50.25);
         let execution_quantity = dec!(5.0);
         let notional_value = calc_notional_value(execution_price, execution_quantity);
-        let execution_timestamp = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+        let execution_timestamp =
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
         let trade = ExecutedTrade::with_calculated_notional(
             order_id.clone(),
@@ -160,9 +161,15 @@ mod test {
         let execution_price = dec!(75.00);
         let execution_quantity = dec!(8.0);
         let notional_value = calc_notional_value(execution_price, execution_quantity);
-        let execution_timestamp = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
+        let execution_timestamp =
+            NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0).unwrap();
 
-        let future_trade = FutureTrade::new(execution_side, execution_price, execution_quantity, execution_timestamp.clone());
+        let future_trade = FutureTrade::new(
+            execution_side,
+            execution_price,
+            execution_quantity,
+            execution_timestamp.clone(),
+        );
 
         let executed_trade = ExecutedTrade::from_future_trade(order_id.clone(), future_trade);
 

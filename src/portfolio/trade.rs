@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::portfolio::assets::AssetHandlers;
 use crate::portfolio::capital::CapitalHandlers;
 use crate::portfolio::position::PositionHandlers;
@@ -7,6 +6,7 @@ use crate::types::{Candle, ExecutedTrade, FailedTrade, FutureTrade, Side, Trade}
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use std::collections::HashMap;
 
 /// Interface methods for storing and retrieving trades, and determining when to trade
 pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
@@ -14,14 +14,14 @@ pub trait TradeHandlers: PositionHandlers + AssetHandlers + CapitalHandlers {
     fn add_failed_trade(&mut self, trade: FailedTrade);
     fn add_executed_trade(&mut self, trade: ExecutedTrade);
 
-    #[deprecated(note="Responsibility is moving to crate::PositionManager")]
+    #[deprecated(note = "Responsibility is moving to crate::PositionManager")]
     fn generate_sell_opt(&self, candle: &Candle) -> Option<FutureTrade>;
-    #[deprecated(note="Responsibility is moving to crate::PositionManager")]
+    #[deprecated(note = "Responsibility is moving to crate::PositionManager")]
     fn generate_buy_opt(&self, candle: &Candle) -> Option<FutureTrade>;
-    #[deprecated(note="Responsibility is moving to crate::PositionManager")]
+    #[deprecated(note = "Responsibility is moving to crate::PositionManager")]
     fn get_buy_cost(&self) -> Decimal;
     fn get_last_trade(&self) -> Option<&ExecutedTrade>;
-    #[deprecated(note="Responsibility is moving to crate::PositionManager")]
+    #[deprecated(note = "Responsibility is moving to crate::PositionManager")]
     fn able_to_buy(&self) -> bool;
 }
 
@@ -66,13 +66,12 @@ impl TradeHandlers for Portfolio {
 
     fn generate_buy_opt(&self, candle: &Candle) -> Option<FutureTrade> {
         if !self.able_to_buy() {
-            return None
+            return None;
         }
         let rate = calculate_buy_rate(candle);
         let cost = self.get_buy_cost();
         Some(FutureTrade::new(Side::Buy, rate, cost, candle.time))
     }
-
 
     /// The amount of capital to use for a single buy trade
     ///
@@ -189,7 +188,7 @@ mod tests {
             Side::Sell,
             dec!(100.0),
             dec!(1.0),
-            (Utc::now() + Duration::seconds(1)).naive_utc()
+            (Utc::now() + Duration::seconds(1)).naive_utc(),
         );
         portfolio.add_executed_trade(trade);
         assert_eq!(portfolio.executed_trades.len(), 2);
@@ -224,7 +223,8 @@ mod tests {
         let quantity = dec!(1.0);
         let time = Utc::now().naive_utc();
 
-        let trade = ExecutedTrade::with_calculated_notional("id".to_string(), side, price, quantity, time);
+        let trade =
+            ExecutedTrade::with_calculated_notional("id".to_string(), side, price, quantity, time);
         portfolio.add_executed_trade(trade);
 
         let last_trade = portfolio.get_last_trade().unwrap();

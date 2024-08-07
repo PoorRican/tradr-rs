@@ -1,13 +1,13 @@
 mod consensus;
 
-use std::path::{Path, PathBuf};
-use log::info;
 use crate::indicators::GraphProcessingError;
-pub use crate::strategies::consensus::Consensus;
-use crate::types::Signal;
-use polars::prelude::*;
 use crate::markets::utils::save_candles;
 use crate::processor::CandleProcessor;
+pub use crate::strategies::consensus::Consensus;
+use crate::types::Signal;
+use log::info;
+use polars::prelude::*;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub enum StrategyError {
@@ -15,7 +15,8 @@ pub enum StrategyError {
 }
 
 /// A [`IndicatorContainer`] is a collection of [`CandleProcessor`] objects.
-type IndicatorContainer = Vec<Box<dyn CandleProcessor<ErrorType=GraphProcessingError, ReturnType=Signal>>>;
+type IndicatorContainer =
+    Vec<Box<dyn CandleProcessor<ErrorType = GraphProcessingError, ReturnType = Signal>>>;
 
 /// A [`Strategy`] is a facade for interfacing with more than one [`CandleProcessor`] objects.
 ///
@@ -41,8 +42,10 @@ impl CandleProcessor for Strategy {
     /// This method is used upon initial load, or during backtesting.
     fn process_candle(&self, candles: &DataFrame) -> Result<Self::ReturnType, Self::ErrorType> {
         let results = self.indicators.iter().map(|indicator| {
-            indicator.process_candle(candles)
-                .map_err(|x| StrategyError::IndicatorError(x)).unwrap()
+            indicator
+                .process_candle(candles)
+                .map_err(|x| StrategyError::IndicatorError(x))
+                .unwrap()
         });
         Ok(self.consensus.reduce(results))
     }
@@ -54,25 +57,30 @@ impl CandleProcessor for Strategy {
     fn get_raw_dataframe(&self, candles: &DataFrame) -> DataFrame {
         info!("Processing indicators for {} rows", candles.height());
 
-        let graphs = self.indicators.iter().map(|indicator| {
-            indicator.get_raw_dataframe(candles)
-        }).collect::<Vec<DataFrame>>();
+        let graphs = self
+            .indicators
+            .iter()
+            .map(|indicator| indicator.get_raw_dataframe(candles))
+            .collect::<Vec<DataFrame>>();
 
         let mut df = graphs.get(0).unwrap().clone();
 
         info!("Joining {} results", graphs.len());
         for idx in 1..graphs.len() {
-            df = df.lazy().join(
-                graphs.get(idx).unwrap().clone().lazy(),
-                [col("time")],
-                [col("time")],
-                JoinArgs::new(JoinType::Left),
-            ).collect().unwrap();
+            df = df
+                .lazy()
+                .join(
+                    graphs.get(idx).unwrap().clone().lazy(),
+                    [col("time")],
+                    [col("time")],
+                    JoinArgs::new(JoinType::Left),
+                )
+                .collect()
+                .unwrap();
         }
 
         df
     }
-
 }
 
 impl Strategy {
@@ -88,8 +96,7 @@ impl Strategy {
 
         if path.is_file() {
             panic!("Path is a file, expected a directory");
-        }
-        else if !path.exists() {
+        } else if !path.exists() {
             std::fs::create_dir_all(&path).unwrap();
         }
 
@@ -105,8 +112,8 @@ impl Strategy {
 #[cfg(test)]
 mod strategy_tests {
     use super::*;
-    use polars::prelude::*;
     use crate::indicators::BBands;
+    use polars::prelude::*;
 
     fn setup_strategy_with_indicators() -> Strategy {
         let bbands = Box::new(BBands::default());
@@ -121,7 +128,8 @@ mod strategy_tests {
             "time" => dates,
             "open" => opens,
             "close" => closes,
-        ].unwrap()
+        ]
+        .unwrap()
     }
 
     #[test]
@@ -148,7 +156,6 @@ mod strategy_tests {
     fn combined_signals_with_no_signals_returns_hold() {
         todo!()
     }
-
 
     #[test]
     fn combined_signals_with_equal_buy_and_sell_signals_returns_hold() {

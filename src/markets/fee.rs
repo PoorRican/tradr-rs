@@ -1,6 +1,6 @@
+use crate::types::Side;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use crate::types::Side;
 
 /// A trait for calculating the amounts of fees to be deducted from a trade.
 ///

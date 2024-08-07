@@ -1,6 +1,6 @@
 use chrono::NaiveDateTime;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::Decimal;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -264,10 +264,10 @@ mod order_type_tests {
 
 #[cfg(test)]
 mod order_request_tests {
-    use rust_decimal::prelude::ToPrimitive;
-    use rust_decimal_macros::dec;
     use crate::markets::coinbase::order::CoinbaseOrderRequest;
     use crate::types::FutureTrade;
+    use rust_decimal::prelude::ToPrimitive;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new_limit_order() {
