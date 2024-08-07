@@ -1,10 +1,12 @@
 mod consensus;
 
-use crate::indicators::{GraphProcessingError, Indicator, IndicatorProcessingError};
+use std::path::{Path, PathBuf};
+use log::info;
+use crate::indicators::GraphProcessingError;
 pub use crate::strategies::consensus::Consensus;
 use crate::types::Signal;
 use polars::prelude::*;
-use std::collections::HashMap;
+use crate::markets::utils::save_candles;
 use crate::processor::CandleProcessor;
 
 #[derive(Debug)]
@@ -12,13 +14,13 @@ pub enum StrategyError {
     IndicatorError(GraphProcessingError),
 }
 
-/// A [`IndicatorContainer`] is a collection of [`Indicator`] objects.
+/// A [`IndicatorContainer`] is a collection of [`CandleProcessor`] objects.
 type IndicatorContainer = Vec<Box<dyn CandleProcessor<ErrorType=GraphProcessingError, ReturnType=Signal>>>;
 
-/// A [`Strategy`] is a facade for interfacing with more than one [`Indicator`] objects.
+/// A [`Strategy`] is a facade for interfacing with more than one [`CandleProcessor`] objects.
 ///
 /// A simple interface is provided for bootstrapping historical candle data, processing new candle data,
-/// and generating a consensus [`Signal`] among all [`Indicator`] objects.
+/// and generating a consensus [`Signal`] among all [`CandleProcessor`] objects.
 ///
 /// `Strategy::process_historical_candles` is used for bootstrapping the indicators with historical data.
 /// `Strategy::process_new_candles` is used for ingesting new candle data and generating a consensus signal.
@@ -33,7 +35,7 @@ impl CandleProcessor for Strategy {
 
     /// Process all historical data
     ///
-    /// The internal state of all [`Indicator`] objects is updated with the historical data. Any existing
+    /// The internal state of all [`CandleProcessor`] objects is updated with the historical data. Any existing
     /// data in the indicators is overwritten.
     ///
     /// This method is used upon initial load, or during backtesting.
@@ -48,6 +50,29 @@ impl CandleProcessor for Strategy {
     fn get_name(&self) -> &'static str {
         "strategy"
     }
+
+    fn get_raw_dataframe(&self, candles: &DataFrame) -> DataFrame {
+        info!("Processing indicators for {} rows", candles.height());
+
+        let graphs = self.indicators.iter().map(|indicator| {
+            indicator.get_raw_dataframe(candles)
+        }).collect::<Vec<DataFrame>>();
+
+        let mut df = graphs.get(0).unwrap().clone();
+
+        info!("Joining {} results", graphs.len());
+        for idx in 1..graphs.len() {
+            df = df.lazy().join(
+                graphs.get(idx).unwrap().clone().lazy(),
+                [col("time")],
+                [col("time")],
+                JoinArgs::new(JoinType::Left),
+            ).collect().unwrap();
+        }
+
+        df
+    }
+
 }
 
 impl Strategy {
@@ -56,6 +81,24 @@ impl Strategy {
             indicators,
             consensus,
         }
+    }
+
+    pub fn save_indicators<P: Into<PathBuf>>(&self, candles: &DataFrame, path: P) {
+        let path = path.into();
+
+        if path.is_file() {
+            panic!("Path is a file, expected a directory");
+        }
+        else if !path.exists() {
+            std::fs::create_dir_all(&path).unwrap();
+        }
+
+        let mut df = self.get_raw_dataframe(candles);
+
+        let joined_path = path.join("indicators.csv");
+        let path = joined_path.to_str().unwrap();
+
+        save_candles(&mut df, path).unwrap();
     }
 }
 

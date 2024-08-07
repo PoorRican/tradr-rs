@@ -1,3 +1,4 @@
+use log::info;
 use crate::indicators::GraphProcessingError;
 use crate::types::Signal;
 use polars::prelude::*;
@@ -138,6 +139,12 @@ impl CandleProcessor for BBands {
 
     fn get_name(&self) -> &'static str {
         "bbands"
+    }
+
+    fn get_raw_dataframe(&self, candles: &DataFrame) -> DataFrame {
+        info!("Calculating Bollinger Bands");
+
+        self.calculate_bollinger_bands(candles).unwrap()
     }
 }
 

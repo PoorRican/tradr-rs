@@ -8,4 +8,9 @@ pub trait CandleProcessor {
     type ErrorType;
     fn process_candle(&self, candles: &DataFrame) -> Result<Self::ReturnType, Self::ErrorType>;
     fn get_name(&self) -> &'static str;
+
+    /// Get computed data for the given candles
+    ///
+    /// Strictly meant for debugging and graphing.
+    fn get_raw_dataframe(&self, candles: &DataFrame) -> DataFrame;
 }

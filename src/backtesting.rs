@@ -264,6 +264,9 @@ impl BacktestingRuntime {
         // save market data
         let path = format!("data/{}_{}.csv", self.trading_config.market_asset, self.trading_config.frequency);
         save_candles(self.market_candles.as_mut().unwrap(), &path).unwrap();
+
+        // save indicators
+        self.strategy.save_indicators(self.trading_candles.as_ref().unwrap(), "data");
     }
 }
 

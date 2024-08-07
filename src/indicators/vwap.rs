@@ -1,3 +1,5 @@
+use chrono::{DateTime, NaiveDateTime};
+use log::info;
 use polars::prelude::*;
 use crate::indicators::GraphProcessingError;
 use crate::processor::CandleProcessor;
@@ -41,6 +43,45 @@ impl CandleProcessor for VWAP {
 
     fn get_name(&self) -> &'static str {
         "vwap"
+    }
+
+    fn get_raw_dataframe(&self, candles: &DataFrame) -> DataFrame {
+        info!("Calculating VWAP");
+
+        let total_rows = candles.height();
+
+        // Calculate initial VWAP for the first window
+        let mut result = calculate_vwap(&candles.head(Some(self.window)), self.window).unwrap();
+
+        // Prepare vectors to store VWAP values and timestamps
+        let mut vwap_values = result.column("vwap").unwrap().f64().unwrap().to_vec();
+        let mut vwap_values = vwap_values.iter().map(|x| x.unwrap()).collect::<Vec<f64>>();
+        let mut timestamps = result.column("time").unwrap().datetime().unwrap().to_vec();
+        let mut timestamps = timestamps.iter().map(|x| x.unwrap()).collect::<Vec<i64>>();
+
+        // Calculate VWAP for the remaining data using a rolling window
+        for i in self.window..total_rows {
+            let window_start = i - self.window + 1;
+
+            let window_df = candles.slice(window_start as i64, self.window);
+            let window_vwap = calculate_vwap(&window_df, self.window).unwrap();
+
+            let vwap_value = window_vwap.column("vwap").unwrap().f64().unwrap().get(self.window - 1).unwrap();
+            let timestamp = window_vwap.column("time").unwrap().datetime().unwrap().get(self.window - 1).unwrap();
+
+            vwap_values.push(vwap_value);
+            timestamps.push(timestamp);
+        }
+
+        // convert timestamps to DateTime
+
+        let timestamps = timestamps.iter().map(|x| DateTime::from_timestamp_millis(*x).unwrap().naive_utc()).collect::<Vec<NaiveDateTime>>();
+
+        // Create a new DataFrame with the calculated VWAP values
+        DataFrame::new(vec![
+            Series::new("time", timestamps),
+            Series::new("vwap", vwap_values),
+        ]).unwrap()
     }
 }
 

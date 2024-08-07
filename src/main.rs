@@ -34,5 +34,6 @@ fn main() {
     runtime.run().unwrap();
 
     // Save runtime data
+    info!("Saving runtime data");
     runtime.save_data();
 }

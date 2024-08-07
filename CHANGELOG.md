@@ -9,6 +9,7 @@
 ### Code Changes
 
 - Implement `VWAP` indicator in main example
+- Add a trait method `get_raw_dataframe` to `CandleProcessor` for getting computed data for a given indicator
 
 ---
 
