@@ -113,6 +113,7 @@ impl BacktestingRuntime {
     }
 
     pub fn load_candles(mut self) -> Result<Self, BacktestingErrors> {
+        info!("******************************************\nLoading Candles");
         // load candle data
         self.market_candle_data = MarketData::from_db(&self.trading_config.market_asset).into();
         self.trading_candle_data = MarketData::from_db(&self.trading_config.trading_asset).into();
@@ -125,6 +126,8 @@ impl BacktestingRuntime {
         // populate market and trading candles
         self.trading_candles = trading_candles.into();
         self.market_candles = self.get_market_asset()?.to_owned().into();
+
+        info!("Finished loading candles");
 
         Ok(self)
     }
@@ -252,8 +255,11 @@ impl BacktestingRuntime {
         print_candle_statistics(candles);
 
         let candle_len = candles.height();
-        info!("Finished processing {:?} rows in {:?}", candle_len, duration);
-        info!("Avg. processing time per row: {:?}", duration / candle_len as u32);
+        info!(r#"Finished processing {:?} rows in {:?}
+Avg. processing time per row: {:?}"#,
+            candle_len,
+            duration,
+            duration / candle_len as u32);
     }
 
     /// Save candles and indicators as CSV
@@ -287,9 +293,15 @@ impl BacktestingRuntime {
 }
 
 fn print_portfolio(portfolio: &Portfolio, starting_capital: Decimal) {
-    info!("Number of open positions: {}", portfolio.get_open_positions().len());
-    info!("Total open quantity: {}", portfolio.total_open_quantity());
-    info!("Total open value: {}", portfolio.total_position_value());
-    info!("Total positions: {}", portfolio.get_executed_trades().len());
-    info!("Profit: {}", portfolio.available_capital() - starting_capital);
+
+    info!(r#"Number of open positions: {}
+Total open quantity: {}
+Total open value: {}
+Total executed positions: {}
+Profit: {}"#,
+        portfolio.get_open_positions().len(),
+        portfolio.total_open_quantity(),
+        portfolio.total_position_value(),
+        portfolio.get_executed_trades().len(),
+        portfolio.available_capital() - starting_capital);
 }

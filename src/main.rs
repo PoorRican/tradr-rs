@@ -30,10 +30,10 @@ fn main() {
         strategy
     ).load_candles().expect("Could not load candles");
 
-    info!("Starting to process");
+    info!("******************************************\nStarting to process");
     runtime.run().unwrap();
 
     // Save runtime data
-    info!("Saving runtime data");
+    info!("******************************************\nSaving backtesting runtime data");
     runtime.save_data("data/backtesting");
 }
