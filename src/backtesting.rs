@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Instant, Duration};
 use chrono::{DateTime};
 use log::info;
@@ -256,17 +256,33 @@ impl BacktestingRuntime {
         info!("Avg. processing time per row: {:?}", duration / candle_len as u32);
     }
 
-    pub fn save_data(&mut self) {
+    /// Save candles and indicators as CSV
+    ///
+    /// # Arguments
+    /// * `path` - The directory to save the data
+    pub fn save_data<P: Into<PathBuf>>(&mut self, path: P) {
+        let path = path.into();
+
+        // check that the path is not a file, and exists
+        if path.is_file() {
+            panic!("Path is a file, expected a directory");
+        }
+        else if !path.exists() {
+            std::fs::create_dir(&path).unwrap();
+        }
+
         // save trading assets
-        let path = format!("data/{}_{}.csv", self.trading_config.trading_asset, self.trading_config.frequency);
-        save_candles(self.trading_candles.as_mut().unwrap(), &path).unwrap();
+        let filename = format!("{}_{}.csv", self.trading_config.trading_asset, self.trading_config.frequency);
+        let trading_candles_path = path.join(filename);
+        save_candles(self.trading_candles.as_mut().unwrap(), trading_candles_path.to_str().unwrap()).unwrap();
 
         // save market data
-        let path = format!("data/{}_{}.csv", self.trading_config.market_asset, self.trading_config.frequency);
-        save_candles(self.market_candles.as_mut().unwrap(), &path).unwrap();
+        let filename = format!("{}_{}.csv", self.trading_config.market_asset, self.trading_config.frequency);
+        let market_candles_path = path.join(filename);
+        save_candles(self.market_candles.as_mut().unwrap(), market_candles_path.to_str().unwrap()).unwrap();
 
         // save indicators
-        self.strategy.save_indicators(self.trading_candles.as_ref().unwrap(), "data");
+        self.strategy.save_indicators(self.trading_candles.as_ref().unwrap(), path);
     }
 }
 

@@ -35,5 +35,5 @@ fn main() {
 
     // Save runtime data
     info!("Saving runtime data");
-    runtime.save_data();
+    runtime.save_data("data/backtesting");
 }

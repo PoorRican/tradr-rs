@@ -10,6 +10,7 @@
 
 - Implement `VWAP` indicator in main example
 - Add a trait method `get_raw_dataframe` to `CandleProcessor` for getting computed data for a given indicator
+- Add `path` argument to `BacktestingRuntime::save_data` for saving data to a specific location
 
 ---
 
