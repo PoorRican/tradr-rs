@@ -284,6 +284,7 @@ impl BacktestingRuntime {
     /// * `duration` - The duration of the backtesting run
     /// * `portfolio` - The portfolio after the backtesting run
     fn print_statistics(&self, duration: Duration, portfolio: &Portfolio) {
+        info!("******************************************\nBacktesting Statistics");
         // print basic statistics
         print_portfolio(portfolio, self.portfolio_args.capital);
 
