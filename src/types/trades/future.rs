@@ -27,7 +27,13 @@ impl FutureTrade {
         }
     }
 
-    pub fn new_with_nominal(side: Side, price: Decimal, quantity: Decimal, cost: Decimal, point: NaiveDateTime) -> FutureTrade {
+    pub fn new_with_nominal(
+        side: Side,
+        price: Decimal,
+        quantity: Decimal,
+        cost: Decimal,
+        point: NaiveDateTime,
+    ) -> FutureTrade {
         FutureTrade {
             side,
             price,

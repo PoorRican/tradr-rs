@@ -1,7 +1,7 @@
 use chrono::{NaiveDateTime, Utc};
 use polars::prelude::*;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::Decimal;
 
 /// Create a DataFrame with a single row
 ///
@@ -174,7 +174,10 @@ mod tests {
 
         let mut chart = TrackedValue::with_initial(start_val, start_time);
         for i in 0..10 {
-            chart.add_value(start_val + Decimal::from(i), start_time + Duration::seconds(i));
+            chart.add_value(
+                start_val + Decimal::from(i),
+                start_time + Duration::seconds(i),
+            );
         }
 
         let last_value = chart.get_last_value();

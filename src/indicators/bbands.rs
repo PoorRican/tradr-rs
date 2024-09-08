@@ -1,7 +1,8 @@
 use crate::indicators::GraphProcessingError;
-use crate::types::Signal;
-use polars::prelude::*;
 use crate::processor::CandleProcessor;
+use crate::types::Signal;
+use log::info;
+use polars::prelude::*;
 
 const DEFAULT_PERIOD: usize = 20;
 const DEFAULT_MULTIPLIER: f64 = 2.0;
@@ -82,9 +83,27 @@ impl BBands {
     ) -> Result<Signal, GraphProcessingError> {
         let graph = graph.tail(Some(1));
 
-        let lower = graph.column("lower").unwrap().f64().unwrap().get(0).unwrap();
-        let middle = graph.column("middle").unwrap().f64().unwrap().get(0).unwrap();
-        let upper = graph.column("upper").unwrap().f64().unwrap().get(0).unwrap();
+        let lower = graph
+            .column("lower")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        let middle = graph
+            .column("middle")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        let upper = graph
+            .column("upper")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
 
         let candle_price = candles
             .column(DEFAULT_SOURCE_COL_NAME)
@@ -114,7 +133,6 @@ impl Default for BBands {
     }
 }
 
-
 impl CandleProcessor for BBands {
     type ReturnType = Signal;
     type ErrorType = GraphProcessingError;
@@ -138,6 +156,12 @@ impl CandleProcessor for BBands {
 
     fn get_name(&self) -> &'static str {
         "bbands"
+    }
+
+    fn get_raw_dataframe(&self, candles: &DataFrame) -> DataFrame {
+        info!("Calculating Bollinger Bands");
+
+        self.calculate_bollinger_bands(candles).unwrap()
     }
 }
 

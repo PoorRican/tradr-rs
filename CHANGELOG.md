@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## v0.5.1
+
+### New Features
+
+- Show P&L at the end of backtesting
+
+### Code Changes
+
+- Implement `VWAP` indicator in main example
+- Add a trait method `get_raw_dataframe` to `CandleProcessor` for getting computed data for a given indicator
+- Add `path` argument to `BacktestingRuntime::save_data` for saving data to a specific location
+- Improve logging output
+
+---
+
 ## v0.5.0
 
 Massive changes to the way indicators are handled only using the `CandleProcessor` interface. This eliminates internal

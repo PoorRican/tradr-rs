@@ -1,17 +1,17 @@
+use crate::portfolio::{Portfolio, PositionHandlers};
+use crate::types::{Candle, Trade};
 /// Functions for calculating risk metrics for a portfolio
 ///
 /// The primary function is [`calculate_risk`], which accepts a [`Portfolio`] and market data as input and returns a [`PortfolioRisk`] struct.
 use rust_decimal::{Decimal, MathematicalOps};
 use rust_decimal_macros::dec;
-use crate::portfolio::{Portfolio, PositionHandlers};
-use crate::types::{Candle, Trade};
 
 #[derive(Debug)]
 pub enum RiskCalculationErrors {
     /// The market data and historical data are not aligned by timestamp
     CandleDataNotAligned,
 
-    CouldNotExtract
+    CouldNotExtract,
 }
 
 /// Calculate risk metrics for a portfolio against market data, and historical data for the asset.
@@ -28,17 +28,28 @@ pub enum RiskCalculationErrors {
 /// # Errors
 ///
 /// - [`RiskCalculationErrors::CandleDataNotAligned`] - The market data and historical data are not aligned by timestamp
-pub fn calculate_risk(portfolio: &Portfolio, market_data: &[Candle], historical_data: &[Candle]) -> Result<PortfolioRisk, RiskCalculationErrors> {
+pub fn calculate_risk(
+    portfolio: &Portfolio,
+    market_data: &[Candle],
+    historical_data: &[Candle],
+) -> Result<PortfolioRisk, RiskCalculationErrors> {
     // ensure that the market data and historical data are sorted by timestamp
-    let market_data_index = market_data.iter().map(|candle| candle.time).collect::<Vec<_>>();
-    let historical_data_index = historical_data.iter().map(|candle| candle.time).collect::<Vec<_>>();
+    let market_data_index = market_data
+        .iter()
+        .map(|candle| candle.time)
+        .collect::<Vec<_>>();
+    let historical_data_index = historical_data
+        .iter()
+        .map(|candle| candle.time)
+        .collect::<Vec<_>>();
 
     if market_data_index != historical_data_index {
-        return Err(RiskCalculationErrors::CandleDataNotAligned)
+        return Err(RiskCalculationErrors::CandleDataNotAligned);
     }
 
     let current_price = get_current_price(historical_data);
-    let (total_position_value, average_entry_price, unrealized_pnl) = calculate_position_metrics(portfolio, current_price);
+    let (total_position_value, average_entry_price, unrealized_pnl) =
+        calculate_position_metrics(portfolio, current_price);
     let returns = calculate_returns(historical_data);
 
     let value_at_risk = if total_position_value == Decimal::ZERO {
@@ -60,14 +71,17 @@ pub fn calculate_risk(portfolio: &Portfolio, market_data: &[Candle], historical_
 }
 
 /// Calculate total position value, average entry price, and unrealized P&L for a portfolio
-fn calculate_position_metrics(portfolio: &Portfolio, current_price: Decimal) -> (Decimal, Decimal, Decimal) {
+fn calculate_position_metrics(
+    portfolio: &Portfolio,
+    current_price: Decimal,
+) -> (Decimal, Decimal, Decimal) {
     let mut total_position_value = dec!(0);
     let mut total_cost = dec!(0);
     let mut total_quantity = dec!(0);
 
     let open_positions = portfolio.get_open_positions_as_trades();
     if open_positions.is_none() {
-        return (dec!(0), dec!(0), dec!(0))
+        return (dec!(0), dec!(0), dec!(0));
     }
 
     for trade in open_positions.unwrap().iter() {
@@ -108,7 +122,9 @@ fn calculate_value_at_risk(returns: &[Decimal], total_position_value: Decimal) -
 fn calculate_beta(market_data: &[Candle], asset_returns: &[Decimal]) -> Decimal {
     let market_returns = calculate_returns(market_data);
 
-    let (sum_xy, sum_x, sum_y, sum_x_squared) = market_returns.iter().zip(asset_returns.iter())
+    let (sum_xy, sum_x, sum_y, sum_x_squared) = market_returns
+        .iter()
+        .zip(asset_returns.iter())
         .fold((dec!(0), dec!(0), dec!(0), dec!(0)), |acc, (&x, &y)| {
             (acc.0 + x * y, acc.1 + x, acc.2 + y, acc.3 + x * x)
         });
@@ -130,12 +146,14 @@ fn calculate_beta(market_data: &[Candle], asset_returns: &[Decimal]) -> Decimal 
 /// because it should be negligible for short-term trading.
 fn calculate_sharpe_ratio(returns: &[Decimal]) -> Decimal {
     if returns.len() < 2 {
-        return dec!(0)
+        return dec!(0);
     }
     let mean_return = returns.iter().sum::<Decimal>() / Decimal::from(returns.len());
-    let variance = returns.iter()
+    let variance = returns
+        .iter()
         .map(|&r| (r - mean_return) * (r - mean_return))
-        .sum::<Decimal>() / Decimal::from(returns.len() - 1);
+        .sum::<Decimal>()
+        / Decimal::from(returns.len() - 1);
     let std_dev = variance.sqrt().unwrap();
 
     if std_dev.is_zero() {
@@ -150,14 +168,16 @@ fn get_current_price(historical_data: &[Candle]) -> Decimal {
 }
 
 fn calculate_returns(candles: &[Candle]) -> Vec<Decimal> {
-    candles.windows(2)
+    candles
+        .windows(2)
         .map(|window| {
-            let [previous, current] = window else { unreachable!() };
+            let [previous, current] = window else {
+                unreachable!()
+            };
             (current.close - previous.close) / previous.close
         })
         .collect()
 }
-
 
 /// Risk metrics for a portfolio
 ///

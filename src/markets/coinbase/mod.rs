@@ -174,9 +174,9 @@ impl Market for CoinbaseClient {
 
 #[cfg(test)]
 mod tests {
-    use rust_decimal_macros::dec;
     use super::*;
     use crate::types::Side;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_new() {

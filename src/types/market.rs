@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use polars::prelude::DataFrame;
-use sqlite::Connection;
 use crate::traits::AsDataFrame;
 use crate::utils;
+use polars::prelude::DataFrame;
+use sqlite::Connection;
+use std::collections::HashMap;
 
 /// Path to the database file
 const DB_PATH: &str = "data/candle_data.sqlite3";
@@ -28,7 +28,8 @@ impl MarketData {
         let asset_name = asset_name.into();
         let table_names = get_relevant_table_names(&asset_name);
 
-        let candles = table_names.into_iter()
+        let candles = table_names
+            .into_iter()
             .map(|table_name| {
                 let df = utils::extract_candles_from_db(DB_PATH, &table_name)
                     .unwrap()
@@ -59,8 +60,7 @@ impl MarketData {
 /// Used to find all tables relevant to a given asset name
 fn get_relevant_table_names(substring: &String) -> Vec<String> {
     let conn = Connection::open(DB_PATH).unwrap();
-    conn
-        .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+    conn.prepare("SELECT name FROM sqlite_master WHERE type='table'")
         .unwrap()
         .into_iter()
         .map(|row| {
@@ -77,7 +77,8 @@ fn get_relevant_table_names(substring: &String) -> Vec<String> {
 
 /// Extracts the frequency from the table name
 fn extract_frequency_from_table_name(table_name: &String) -> String {
-    INTRADAY_FREQUENCIES.iter()
+    INTRADAY_FREQUENCIES
+        .iter()
         .find(|&freq| table_name.contains(freq))
         .expect("Could not extract frequency from table name")
         .to_string()
